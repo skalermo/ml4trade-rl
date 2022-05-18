@@ -19,7 +19,7 @@ def get_all_scv_filenames(path: str) -> List[str]:
 def setup_sim_env(cfg: DictConfig) -> (SimulationEnv, SimulationEnv):
     orig_cwd = hydra.utils.get_original_cwd()
 
-    weather_data_path = f'{orig_cwd}/../data/.data/weather_unzipped_flattened'
+    weather_data_path = f'{orig_cwd}/data/.data/weather_unzipped_flattened'
     filenames = get_all_scv_filenames(weather_data_path)
     dfs = []
     for f in filenames:
@@ -33,7 +33,7 @@ def setup_sim_env(cfg: DictConfig) -> (SimulationEnv, SimulationEnv):
     weather_df.sort_values(by=['year', 'month', 'day', 'hour'], inplace=True)
     weather_df.fillna(method='bfill', inplace=True)
 
-    prices_pl_path = f'{orig_cwd}/../data/.data/prices_pl.csv'
+    prices_pl_path = f'{orig_cwd}/data/.data/prices_pl.csv'
     prices_df: pd.DataFrame = pd.read_csv(prices_pl_path, header=0)
     prices_df.fillna(method='bfill', inplace=True)
 
