@@ -3,17 +3,17 @@ from typing import List
 from datetime import datetime, time
 import logging
 
-import pandas as pd
 from stable_baselines3 import A2C
+from stable_baselines3.common import logger
+
+import pandas as pd
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import quantstats as qs
+
 from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptionDataStrategy, PricesPlDataStrategy, imgw_col_ids
 from ml4trade.simulation_env import SimulationEnv
 from ml4trade.units import *
-
-
-logger = logging.getLogger(__name__)
 
 
 def get_all_scv_filenames(path: str) -> List[str]:
@@ -74,11 +74,13 @@ def setup_sim_env(cfg: DictConfig) -> (SimulationEnv, SimulationEnv):
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
 def main(cfg: DictConfig) -> None:
-    logger.info(OmegaConf.to_yaml(cfg))
+    logging.info(OmegaConf.to_yaml(cfg))
     env_train, env_test = setup_sim_env(cfg)
     model = A2C('MlpPolicy', env_train,
                 **cfg.agent, verbose=1)
-    model.learn(total_timesteps=cfg.run.learning_steps)
+    custom_logger = logger.configure('.', ['stdout', 'json'])
+    model.set_logger(custom_logger)
+    model.learn(total_timesteps=cfg.run.train_steps)
 
     obs = env_test.reset()
     done = False
