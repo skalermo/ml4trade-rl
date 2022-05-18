@@ -1,13 +1,7 @@
-time:
-  ep_start: '2016-01-01 00:00:00'
-  ep_end: '2021-01-01 00:00:00'
-  scheduling: '10:30:00'
-  action_repl: '00:00:00'
-battery:
-  capacity: 0.1
-  efficiency: 1.0
-  init_charge: 0.05
-wallet:
-  init_balance: 10_000
+defaults:
+  - agent: default
+  - env: default
+  - run: default
+  - _self_
 
-debug: True
+debug: true

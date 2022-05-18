@@ -1,6 +1,7 @@
 import os
 from typing import List
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
+import logging
 
 import pandas as pd
 from stable_baselines3 import A2C
@@ -10,6 +11,9 @@ import quantstats as qs
 from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptionDataStrategy, PricesPlDataStrategy, imgw_col_ids
 from ml4trade.simulation_env import SimulationEnv
 from ml4trade.units import *
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_all_scv_filenames(path: str) -> List[str]:
@@ -45,35 +49,36 @@ def setup_sim_env(cfg: DictConfig) -> (SimulationEnv, SimulationEnv):
 
     env_train = SimulationEnv(
         data_strategies,
-        start_datetime=datetime.fromisoformat(cfg.time.ep_start),
-        end_datetime=datetime.fromisoformat(cfg.time.ep_end),
-        scheduling_time=time.fromisoformat(cfg.time.scheduling),
-        action_replacement_time=time.fromisoformat(cfg.time.action_repl),
-        prosumer_init_balance=Currency(cfg.wallet.init_balance),
-        battery_capacity=MWh(cfg.battery.capacity),
-        battery_init_charge=MWh(cfg.battery.init_charge),
-        battery_efficiency=cfg.battery.efficiency,
+        start_datetime=datetime.fromisoformat(cfg.env.train_ep_start),
+        end_datetime=datetime.fromisoformat(cfg.env.train_ep_end),
+        scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
+        action_replacement_time=time.fromisoformat(cfg.env.action_time),
+        prosumer_init_balance=Currency(cfg.env.init_balance),
+        battery_capacity=MWh(cfg.env.bat_cap),
+        battery_init_charge=MWh(cfg.env.bat_init_charge),
+        battery_efficiency=cfg.env.bat_efficiency,
     )
     env_test = SimulationEnv(
         data_strategies,
-        start_datetime=datetime.fromisoformat(cfg.time.ep_end),
-        end_datetime=datetime.fromisoformat(cfg.time.ep_end) + timedelta(days=365),
-        scheduling_time=time.fromisoformat(cfg.time.scheduling),
-        action_replacement_time=time.fromisoformat(cfg.time.action_repl),
-        prosumer_init_balance=Currency(cfg.wallet.init_balance),
-        battery_capacity=MWh(cfg.battery.capacity),
-        battery_init_charge=MWh(cfg.battery.init_charge),
-        battery_efficiency=cfg.battery.efficiency,
+        start_datetime=datetime.fromisoformat(cfg.env.test_ep_start),
+        end_datetime=datetime.fromisoformat(cfg.env.test_ep_end),
+        scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
+        action_replacement_time=time.fromisoformat(cfg.env.action_time),
+        prosumer_init_balance=Currency(cfg.env.init_balance),
+        battery_capacity=MWh(cfg.env.bat_cap),
+        battery_init_charge=MWh(cfg.env.bat_init_charge),
+        battery_efficiency=cfg.env.bat_efficiency,
     )
     return env_train, env_test
 
 
-@hydra.main(config_path='conf', config_name='config')
+@hydra.main(config_path='conf', config_name='config', version_base='1.1')
 def main(cfg: DictConfig) -> None:
-    print(OmegaConf.to_yaml(cfg))
+    logger.info(OmegaConf.to_yaml(cfg))
     env_train, env_test = setup_sim_env(cfg)
-    model = A2C('MlpPolicy', env_train, verbose=1)
-    model.learn(total_timesteps=1_000)
+    model = A2C('MlpPolicy', env_train,
+                **cfg.agent, verbose=1)
+    model.learn(total_timesteps=cfg.run.learning_steps)
 
     obs = env_test.reset()
     done = False
