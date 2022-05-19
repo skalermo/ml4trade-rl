@@ -79,8 +79,18 @@ def main(cfg: DictConfig) -> None:
     model = A2C('MlpPolicy', env_train,
                 **cfg.agent, verbose=1)
     custom_logger = logger.configure('.', ['stdout', 'json'])
+    orig_cwd = hydra.utils.get_original_cwd()
+    model_name = f'a2c_{cfg.run.train_steps}.zip'
+    model_path = f'{orig_cwd}/{model_name}'
+    print(model_path)
+    if not os.path.exists(model_path):
+        model.learn(total_timesteps=cfg.run.train_steps)
+        model.save(model_name)
+    else:
+        print(f'Model {model_path} already exists. Skipping training...')
+        model.load(model_path)
+
     model.set_logger(custom_logger)
-    model.learn(total_timesteps=cfg.run.train_steps)
 
     obs = env_test.reset()
     done = False
