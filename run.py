@@ -15,6 +15,8 @@ from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptio
 from ml4trade.simulation_env import SimulationEnv
 from ml4trade.units import *
 
+from src.custom_policies import NormalizationPolicy
+
 
 def get_all_scv_filenames(path: str) -> List[str]:
     return [f for f in os.listdir(path) if f.endswith('.csv')]
@@ -44,7 +46,7 @@ def setup_sim_env(cfg: DictConfig) -> (SimulationEnv, SimulationEnv):
     data_strategies = {
         'production': ImgwDataStrategy(weather_df, window_size=24, window_direction='forward'),
         'consumption': HouseholdEnergyConsumptionDataStrategy(window_size=24),
-        'market': PricesPlDataStrategy(prices_df, window_size=24, window_direction='backward')
+        'market': PricesPlDataStrategy(prices_df)
     }
 
     env_train = SimulationEnv(
@@ -76,7 +78,7 @@ def setup_sim_env(cfg: DictConfig) -> (SimulationEnv, SimulationEnv):
 def main(cfg: DictConfig) -> None:
     logging.info(OmegaConf.to_yaml(cfg))
     env_train, env_test = setup_sim_env(cfg)
-    model = A2C('MlpPolicy', env_train,
+    model = A2C(NormalizationPolicy, env_train,
                 **cfg.agent, verbose=1)
     custom_logger = logger.configure('.', ['stdout', 'json'])
     orig_cwd = hydra.utils.get_original_cwd()
