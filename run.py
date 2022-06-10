@@ -1,28 +1,29 @@
 import os
-from typing import List
-from datetime import datetime, time
+from typing import List, Dict, Tuple
+from datetime import datetime, time, timedelta
 import logging
 
 from stable_baselines3 import A2C
 from stable_baselines3.common import logger
-
 import pandas as pd
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import quantstats as qs
 
-from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptionDataStrategy, PricesPlDataStrategy, imgw_col_ids
+from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptionDataStrategy, PricesPlDataStrategy, imgw_col_ids, ImgwWindDataStrategy, ImgwSolarDataStrategy
 from ml4trade.simulation_env import SimulationEnv
-from ml4trade.units import *
+from ml4trade.domain.units import *
+from ml4trade.misc.interval_wrapper import IntervalWrapper
 
-from src.custom_policies import NormalizationPolicy
+from src.norm_ds_wrapper import WeatherWrapper, ConsumptionWrapper, MarketWrapper
+from src.norm_action_wrapper import ActionWrapper
 
 
 def get_all_scv_filenames(path: str) -> List[str]:
     return [f for f in os.listdir(path) if f.endswith('.csv')]
 
 
-def setup_sim_env(cfg: DictConfig) -> (SimulationEnv, SimulationEnv):
+def setup_sim_env(cfg: DictConfig) -> Tuple[SimulationEnv, Dict]:
     orig_cwd = hydra.utils.get_original_cwd()
 
     weather_data_path = f'{orig_cwd}/data/.data/weather_unzipped_flattened'
@@ -42,14 +43,25 @@ def setup_sim_env(cfg: DictConfig) -> (SimulationEnv, SimulationEnv):
     prices_pl_path = f'{orig_cwd}/data/.data/prices_pl.csv'
     prices_df: pd.DataFrame = pd.read_csv(prices_pl_path, header=0)
     prices_df.fillna(method='bfill', inplace=True)
+    prices_df['index'] = pd.to_datetime(prices_df['index'])
+    avg_month_prices: Dict[Tuple[int, int], float] = prices_df.groupby(
+        [prices_df['index'].dt.year.rename('year'), prices_df['index'].dt.month.rename('month')]
+    )['Fixing I Price [PLN/MWh]'].mean().to_dict()
 
+    weather_strat = ImgwDataStrategy(weather_df, window_size=24, window_direction='forward',
+                                     max_solar_power=cfg.env.max_solar_power, solar_efficiency=cfg.env.solar_efficiency,
+                                     max_wind_power=cfg.env.max_wind_power, max_wind_speed=cfg.env.max_wind_speed)
+    weather_strat.imgwWindDataStrategy = WeatherWrapper(ImgwWindDataStrategy(weather_df, window_size=24, window_direction='forward'))
+    weather_strat.imgwSolarDataStrategy = WeatherWrapper(ImgwSolarDataStrategy(weather_df, window_size=24, window_direction='forward'))
     data_strategies = {
-        'production': ImgwDataStrategy(weather_df, window_size=24, window_direction='forward'),
-        'consumption': HouseholdEnergyConsumptionDataStrategy(window_size=24),
-        'market': PricesPlDataStrategy(prices_df)
+        'production': weather_strat,
+        'consumption': ConsumptionWrapper(
+            HouseholdEnergyConsumptionDataStrategy(window_size=24)
+        ),
+        'market': MarketWrapper(PricesPlDataStrategy(prices_df)),
     }
 
-    env_train = SimulationEnv(
+    env = SimulationEnv(
         data_strategies,
         start_datetime=datetime.fromisoformat(cfg.env.train_ep_start),
         end_datetime=datetime.fromisoformat(cfg.env.train_ep_end),
@@ -60,32 +72,24 @@ def setup_sim_env(cfg: DictConfig) -> (SimulationEnv, SimulationEnv):
         battery_init_charge=MWh(cfg.env.bat_init_charge),
         battery_efficiency=cfg.env.bat_efficiency,
     )
-    env_test = SimulationEnv(
-        data_strategies,
-        start_datetime=datetime.fromisoformat(cfg.env.test_ep_start),
-        end_datetime=datetime.fromisoformat(cfg.env.test_ep_end),
-        scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
-        action_replacement_time=time.fromisoformat(cfg.env.action_time),
-        prosumer_init_balance=Currency(cfg.env.init_balance),
-        battery_capacity=MWh(cfg.env.bat_cap),
-        battery_init_charge=MWh(cfg.env.bat_init_charge),
-        battery_efficiency=cfg.env.bat_efficiency,
-    )
-    return env_train, env_test
+    return env, avg_month_prices
 
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
 def main(cfg: DictConfig) -> None:
     logging.info(OmegaConf.to_yaml(cfg))
-    env_train, env_test = setup_sim_env(cfg)
-    model = A2C(NormalizationPolicy, env_train,
+    env, avg_month_prices = setup_sim_env(cfg)
+    env = IntervalWrapper(env, interval=timedelta(days=30 * 3), split_ratio=0.8)
+    max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
+    env = ActionWrapper(env, avg_month_prices, max_power / 2, env.env._clock.view())
+
+    model = A2C('MlpPolicy', env,
                 **cfg.agent, verbose=1)
     custom_logger = logger.configure('.', ['stdout', 'json'])
     orig_cwd = hydra.utils.get_original_cwd()
     model_name = f'a2c_{cfg.run.train_steps}.zip'
     model_path = f'{orig_cwd}/{model_name}'
     model.set_logger(custom_logger)
-    print(model_path)
     if not os.path.exists(model_path):
         model.learn(total_timesteps=cfg.run.train_steps)
         model.save(model_name)
@@ -93,16 +97,18 @@ def main(cfg: DictConfig) -> None:
         print(f'Model {model_path} already exists. Skipping training...')
         model.load(model_path)
 
-    obs = env_test.reset()
+    obs = env.set_to_test_and_reset()
     done = False
     while not done:
-        action, _states = model.predict(obs)
-        obs, rewards, done, info = env_test.step(action)
+        action, _states = model.predict(obs, deterministic=True)
+        obs, rewards, done, info = env.step(action)
 
+    env.env.env.save_history()
+    env.render_all()
     qs.extend_pandas()
-    net_worth = pd.Series(env_test.history['wallet_balance'], index=env_test.history['datetime'])
+    net_worth = pd.Series(env.history['wallet_balance'], index=env.history['datetime'])
     returns = net_worth.pct_change().iloc[1:]
-    qs.reports.full(returns)
+    # qs.reports.full(returns)
     qs.reports.html(returns, output='a2c_quantstats.html', download_filename='a2c_quantstats.html')
 
 
