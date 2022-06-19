@@ -13,10 +13,8 @@ import quantstats as qs
 from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptionDataStrategy, PricesPlDataStrategy, imgw_col_ids, ImgwWindDataStrategy, ImgwSolarDataStrategy
 from ml4trade.simulation_env import SimulationEnv
 from ml4trade.domain.units import *
-from ml4trade.misc.interval_wrapper import IntervalWrapper
-
-from src.norm_ds_wrapper import WeatherWrapper, ConsumptionWrapper, MarketWrapper
-from src.norm_action_wrapper import ActionWrapper
+from ml4trade.misc import IntervalWrapper, ActionWrapper, WeatherWrapper, ConsumptionWrapper, MarketWrapper
+from ml4trade.rendering.charts import render_all
 
 
 def get_all_scv_filenames(path: str) -> List[str]:
@@ -103,7 +101,7 @@ def main(cfg: DictConfig) -> None:
         action, _states = model.predict(obs, deterministic=True)
         obs, rewards, done, info = env.step(action)
 
-    env.env.env.save_history()
+    env.save_history()
     env.render_all()
     qs.extend_pandas()
     net_worth = pd.Series(env.history['wallet_balance'], index=env.history['datetime'])
