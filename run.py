@@ -1,9 +1,10 @@
 import os
+import sys
 from typing import List, Dict, Tuple
 from datetime import datetime, time, timedelta
 import logging
 
-from stable_baselines3 import A2C
+from stable_baselines3 import A2C, PPO
 from stable_baselines3.common import logger
 import pandas as pd
 import hydra
@@ -14,7 +15,6 @@ from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptio
 from ml4trade.simulation_env import SimulationEnv
 from ml4trade.domain.units import *
 from ml4trade.misc import IntervalWrapper, ActionWrapper, WeatherWrapper, ConsumptionWrapper, MarketWrapper
-from ml4trade.rendering.charts import render_all
 
 
 def get_all_scv_filenames(path: str) -> List[str]:
@@ -75,25 +75,31 @@ def setup_sim_env(cfg: DictConfig) -> Tuple[SimulationEnv, Dict]:
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
 def main(cfg: DictConfig) -> None:
+    agent_name = 'ppo' if any('ppo' in arg for arg in sys.argv) else 'a2c'
+    agent_class = {
+        'ppo': PPO,
+        'a2c': A2C,
+    }[agent_name]
+    logging.info(f'agent={agent_name}')
     logging.info(OmegaConf.to_yaml(cfg))
     env, avg_month_prices = setup_sim_env(cfg)
     env = IntervalWrapper(env, interval=timedelta(days=30 * 3), split_ratio=0.8)
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
     env = ActionWrapper(env, avg_month_prices, max_power / 2, env.env._clock.view())
 
-    model = A2C('MlpPolicy', env,
-                **cfg.agent, verbose=1)
+    model = agent_class('MlpPolicy', env,
+                        **cfg.agent, verbose=1)
     custom_logger = logger.configure('.', ['stdout', 'json'])
     orig_cwd = hydra.utils.get_original_cwd()
-    model_name = f'a2c_{cfg.run.train_steps}.zip'
-    model_path = f'{orig_cwd}/{model_name}'
+    model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
+    model_path = f'{orig_cwd}/{model_file}'
     model.set_logger(custom_logger)
     if not os.path.exists(model_path):
         model.learn(total_timesteps=cfg.run.train_steps)
-        model.save(model_name)
+        model.save(model_file)
     else:
         print(f'Model {model_path} already exists. Skipping training...')
-        model.load(model_path)
+        model = agent_class.load(model_path, env)
 
     obs = env.set_to_test_and_reset()
     done = False
@@ -101,13 +107,14 @@ def main(cfg: DictConfig) -> None:
         action, _states = model.predict(obs, deterministic=True)
         obs, rewards, done, info = env.step(action)
 
+    print(env.env.env._prosumer.wallet.balance)
     env.save_history()
     env.render_all()
     qs.extend_pandas()
     net_worth = pd.Series(env.history['wallet_balance'], index=env.history['datetime'])
     returns = net_worth.pct_change().iloc[1:]
     # qs.reports.full(returns)
-    qs.reports.html(returns, output='a2c_quantstats.html', download_filename='a2c_quantstats.html')
+    qs.reports.html(returns, output=f'{agent_name}_quantstats.html', download_filename=f'{agent_name}_quantstats.html')
 
 
 if __name__ == '__main__':
