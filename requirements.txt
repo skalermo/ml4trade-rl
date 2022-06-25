@@ -1,4 +1,4 @@
-git+ssh://git@github.com/skalermo/ml4trade.git@setup
+git+ssh://git@github.com/skalermo/ml4trade.git
 pandas
 stable-baselines3
 hydra-core
