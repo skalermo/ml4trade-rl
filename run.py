@@ -1,31 +1,30 @@
+import logging
 import os
 import sys
-from typing import List, Dict, Tuple
 from datetime import datetime, time, timedelta
-import logging
+from typing import List, Dict, Tuple
 
-from stable_baselines3 import A2C, PPO
-from stable_baselines3.common import logger
-import pandas as pd
 import hydra
-from omegaconf import DictConfig, OmegaConf
+import numpy as np
+import pandas as pd
 import quantstats as qs
-
-from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptionDataStrategy, PricesPlDataStrategy, imgw_col_ids, ImgwWindDataStrategy, ImgwSolarDataStrategy
-from ml4trade.simulation_env import SimulationEnv
+from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptionDataStrategy, PricesPlDataStrategy, \
+    imgw_col_ids, ImgwWindDataStrategy, ImgwSolarDataStrategy
 from ml4trade.domain.units import *
 from ml4trade.misc import IntervalWrapper, ActionWrapper, WeatherWrapper, ConsumptionWrapper, MarketWrapper
+from ml4trade.simulation_env import SimulationEnv
+from omegaconf import DictConfig, OmegaConf
+from stable_baselines3 import A2C, PPO
+from stable_baselines3.common import logger
 
 
-def get_all_scv_filenames(path: str) -> List[str]:
-    return [f for f in os.listdir(path) if f.endswith('.csv')]
+def get_weather_df(original_cwd: str) -> pd.DataFrame:
+    weather_data_path = f'{original_cwd}/data/.data/weather_unzipped_flattened'
 
+    def _get_all_scv_filenames(path: str) -> List[str]:
+        return [f for f in os.listdir(path) if f.endswith('.csv')]
 
-def setup_sim_env(cfg: DictConfig) -> Tuple[SimulationEnv, Dict]:
-    orig_cwd = hydra.utils.get_original_cwd()
-
-    weather_data_path = f'{orig_cwd}/data/.data/weather_unzipped_flattened'
-    filenames = get_all_scv_filenames(weather_data_path)
+    filenames = _get_all_scv_filenames(weather_data_path)
     dfs = []
     for f in filenames:
         df = pd.read_csv(f'{weather_data_path}/{f}', header=None, encoding='cp1250',
@@ -37,27 +36,41 @@ def setup_sim_env(cfg: DictConfig) -> Tuple[SimulationEnv, Dict]:
     weather_df = weather_df.loc[weather_df['code'] == 352200375]
     weather_df.sort_values(by=['year', 'month', 'day', 'hour'], inplace=True)
     weather_df.fillna(method='bfill', inplace=True)
+    return weather_df
 
-    prices_pl_path = f'{orig_cwd}/data/.data/prices_pl.csv'
+
+def get_prices_df(original_cwd: str) -> pd.DataFrame:
+    prices_pl_path = f'{original_cwd}/data/.data/prices_pl.csv'
     prices_df: pd.DataFrame = pd.read_csv(prices_pl_path, header=0)
     prices_df.fillna(method='bfill', inplace=True)
     prices_df['index'] = pd.to_datetime(prices_df['index'])
+    return prices_df
+
+
+def get_data_strategies(cfg: DictConfig, weather_df: pd.DataFrame, prices_df: pd.DataFrame) -> Dict:
+    weather_strat = ImgwDataStrategy(weather_df, window_size=24, window_direction='forward',
+                                     max_solar_power=cfg.env.max_solar_power, solar_efficiency=cfg.env.solar_efficiency,
+                                     max_wind_power=cfg.env.max_wind_power, max_wind_speed=cfg.env.max_wind_speed)
+    weather_strat.imgwWindDataStrategy = WeatherWrapper(
+        ImgwWindDataStrategy(weather_df, window_size=24, window_direction='forward'))
+    weather_strat.imgwSolarDataStrategy = WeatherWrapper(
+        ImgwSolarDataStrategy(weather_df, window_size=24, window_direction='forward'))
+    return {
+        'production': weather_strat,
+        'consumption': ConsumptionWrapper(HouseholdEnergyConsumptionDataStrategy(window_size=24)),
+        'market': MarketWrapper(PricesPlDataStrategy(prices_df)),
+    }
+
+
+def setup_sim_env(cfg: DictConfig):
+    orig_cwd = hydra.utils.get_original_cwd()
+    weather_df = get_weather_df(orig_cwd)
+    prices_df = get_prices_df(orig_cwd)
     avg_month_prices: Dict[Tuple[int, int], float] = prices_df.groupby(
         [prices_df['index'].dt.year.rename('year'), prices_df['index'].dt.month.rename('month')]
     )['Fixing I Price [PLN/MWh]'].mean().to_dict()
 
-    weather_strat = ImgwDataStrategy(weather_df, window_size=24, window_direction='forward',
-                                     max_solar_power=cfg.env.max_solar_power, solar_efficiency=cfg.env.solar_efficiency,
-                                     max_wind_power=cfg.env.max_wind_power, max_wind_speed=cfg.env.max_wind_speed)
-    weather_strat.imgwWindDataStrategy = WeatherWrapper(ImgwWindDataStrategy(weather_df, window_size=24, window_direction='forward'))
-    weather_strat.imgwSolarDataStrategy = WeatherWrapper(ImgwSolarDataStrategy(weather_df, window_size=24, window_direction='forward'))
-    data_strategies = {
-        'production': weather_strat,
-        'consumption': ConsumptionWrapper(
-            HouseholdEnergyConsumptionDataStrategy(window_size=24)
-        ),
-        'market': MarketWrapper(PricesPlDataStrategy(prices_df)),
-    }
+    data_strategies = get_data_strategies(cfg, weather_df, prices_df)
 
     env = SimulationEnv(
         data_strategies,
@@ -70,7 +83,38 @@ def setup_sim_env(cfg: DictConfig) -> Tuple[SimulationEnv, Dict]:
         battery_init_charge=MWh(cfg.env.bat_init_charge),
         battery_efficiency=cfg.env.bat_efficiency,
     )
-    return env, avg_month_prices
+    iw_env = IntervalWrapper(env, interval=timedelta(days=30 * 3), split_ratio=0.8)
+    max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
+    aw_env = ActionWrapper(iw_env, avg_month_prices, max_power / 2, env._clock.view())
+    return aw_env
+
+
+def evaluate_policy(model, env, n_eval_episodes: int = 5):
+    episode_rewards = []
+    episode_profits = []
+    for i in range(n_eval_episodes):
+        obs = env.set_to_test_and_reset()
+        done = False
+        ep_reward = 0
+        while not done:
+            action, _states = model.predict(obs, deterministic=True)
+            obs, rewards, done, info = env.step(action)
+            ep_reward += rewards
+        episode_rewards.append(ep_reward)
+        episode_profits.append(env.env.env._prosumer.wallet.balance.value)
+    mean_reward = np.mean(episode_rewards)
+    std_reward = np.std(episode_rewards)
+    mean_profit = np.mean(episode_profits)
+    std_profit = np.std(episode_profits)
+    return mean_reward, std_reward, mean_profit, std_profit
+
+
+def quantstats_summary(env_history, agent_name):
+    qs.extend_pandas()
+    net_worth = pd.Series(env_history['wallet_balance'], index=env_history['datetime'])
+    returns = net_worth.pct_change().iloc[1:]
+    # qs.reports.full(returns)
+    qs.reports.html(returns, output=f'{agent_name}_quantstats.html', download_filename=f'{agent_name}_quantstats.html')
 
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
@@ -82,10 +126,7 @@ def main(cfg: DictConfig) -> None:
     }[agent_name]
     logging.info(f'agent={agent_name}')
     logging.info(OmegaConf.to_yaml(cfg))
-    env, avg_month_prices = setup_sim_env(cfg)
-    env = IntervalWrapper(env, interval=timedelta(days=30 * 3), split_ratio=0.8)
-    max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
-    env = ActionWrapper(env, avg_month_prices, max_power / 2, env.env._clock.view())
+    env = setup_sim_env(cfg)
 
     model = agent_class('MlpPolicy', env,
                         **cfg.agent, verbose=1)
@@ -101,20 +142,12 @@ def main(cfg: DictConfig) -> None:
         print(f'Model {model_path} already exists. Skipping training...')
         model = agent_class.load(model_path, env)
 
-    obs = env.set_to_test_and_reset()
-    done = False
-    while not done:
-        action, _states = model.predict(obs, deterministic=True)
-        obs, rewards, done, info = env.step(action)
-
-    print(env.env.env._prosumer.wallet.balance)
+    mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, env)
+    logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
+    logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
     env.save_history()
     env.render_all()
-    qs.extend_pandas()
-    net_worth = pd.Series(env.history['wallet_balance'], index=env.history['datetime'])
-    returns = net_worth.pct_change().iloc[1:]
-    # qs.reports.full(returns)
-    qs.reports.html(returns, output=f'{agent_name}_quantstats.html', download_filename=f'{agent_name}_quantstats.html')
+    quantstats_summary(env.history, agent_name)
 
 
 if __name__ == '__main__':
