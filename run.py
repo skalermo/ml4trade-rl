@@ -61,8 +61,8 @@ def setup_sim_env(cfg: DictConfig) -> Tuple[SimulationEnv, Dict]:
 
     env = SimulationEnv(
         data_strategies,
-        start_datetime=datetime.fromisoformat(cfg.env.train_ep_start),
-        end_datetime=datetime.fromisoformat(cfg.env.train_ep_end),
+        start_datetime=datetime.fromisoformat(cfg.env.start),
+        end_datetime=datetime.fromisoformat(cfg.env.end),
         scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
         action_replacement_time=time.fromisoformat(cfg.env.action_time),
         prosumer_init_balance=Currency(cfg.env.init_balance),

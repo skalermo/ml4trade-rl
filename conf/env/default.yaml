@@ -1,8 +1,6 @@
 # time config
-train_ep_start: '2016-01-01 00:00:00'
-train_ep_end: '2022-01-01 00:00:00'
-test_ep_start: ${env.train_ep_end}
-test_ep_end: '2022-01-01 00:00:00'
+start: '2016-01-01 00:00:00'
+end: '2022-01-01 00:00:00'
 scheduling_time: '10:30:00'
 action_time: '00:00:00'
 
