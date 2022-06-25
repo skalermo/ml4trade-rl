@@ -4,4 +4,10 @@ defaults:
   - run: default
   - _self_
 
+tag: ''
+
+hydra:
+  run:
+    dir: ./outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}${tag}
+
 debug: true
