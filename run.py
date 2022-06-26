@@ -52,9 +52,15 @@ def get_data_strategies(cfg: DictConfig, weather_df: pd.DataFrame, prices_df: pd
                                      max_solar_power=cfg.env.max_solar_power, solar_efficiency=cfg.env.solar_efficiency,
                                      max_wind_power=cfg.env.max_wind_power, max_wind_speed=cfg.env.max_wind_speed)
     weather_strat.imgwWindDataStrategy = WeatherWrapper(
-        ImgwWindDataStrategy(weather_df, window_size=24, window_direction='forward'))
+        ImgwWindDataStrategy(weather_df, window_size=24,
+                             max_wind_power=MW(cfg.env.max_wind_power), max_wind_speed=cfg.env.max_wind_speed,
+                             window_direction='forward')
+    )
     weather_strat.imgwSolarDataStrategy = WeatherWrapper(
-        ImgwSolarDataStrategy(weather_df, window_size=24, window_direction='forward'))
+        ImgwSolarDataStrategy(weather_df, window_size=24,
+                              max_solar_power=MW(cfg.env.max_solar_power), solar_efficiency=cfg.env.solar_efficiency,
+                              window_direction='forward')
+    )
     return {
         'production': weather_strat,
         'consumption': ConsumptionWrapper(HouseholdEnergyConsumptionDataStrategy(window_size=24)),
@@ -142,7 +148,7 @@ def main(cfg: DictConfig) -> None:
         print(f'Model {model_path} already exists. Skipping training...')
         model = agent_class.load(model_path, env)
 
-    mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, env)
+    mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, env, n_eval_episodes=5)
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
     env.save_history()
