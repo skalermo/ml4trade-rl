@@ -10,7 +10,8 @@ bat_efficiency: 0.5
 bat_init_charge: 0.05
 
 # wallet config
-init_balance: 10_000
+#init_balance: 10_000
+init_balance: 0
 
 # energy_systems
 max_solar_power: 0.001
