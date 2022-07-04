@@ -64,7 +64,7 @@ def get_data_strategies(cfg: DictConfig, weather_df: pd.DataFrame, prices_df: pd
     return {
         'production': weather_strat,
         'consumption': ConsumptionWrapper(HouseholdEnergyConsumptionDataStrategy(window_size=24)),
-        'market': MarketWrapper(PricesPlDataStrategy(prices_df)),
+        'market': PricesPlDataStrategy(prices_df),
     }
 
 
