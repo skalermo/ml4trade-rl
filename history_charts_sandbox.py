@@ -13,6 +13,7 @@ def main():
     with open(history_file) as f:
         history = json.load(f)
 
+    history['step_datetime'] = list(map(datetime.fromisoformat, history['step_datetime']))
     history['datetime'] = list(map(datetime.fromisoformat, history['datetime']))
     render_all(history, 2)
 
