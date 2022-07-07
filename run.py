@@ -13,6 +13,7 @@ from ml4trade.data_strategies import ImgwDataStrategy, HouseholdEnergyConsumptio
 from ml4trade.domain.units import *
 from ml4trade.misc import IntervalWrapper, ActionWrapper, WeatherWrapper, ConsumptionWrapper, MarketWrapper
 from ml4trade.simulation_env import SimulationEnv
+from ml4trade.rendering import render_all
 from omegaconf import DictConfig, OmegaConf
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common import logger
@@ -89,6 +90,8 @@ def setup_sim_env(cfg: DictConfig):
         battery_init_charge=MWh(cfg.env.bat_init_charge),
         battery_efficiency=cfg.env.bat_efficiency,
     )
+    data_strategies['market'].avg_month_prices = avg_month_prices
+    data_strategies['market'].clock_view = env._clock.view()
     iw_env = IntervalWrapper(env, interval=timedelta(days=30 * 3), split_ratio=0.8)
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
     aw_env = ActionWrapper(iw_env, avg_month_prices, max_power / 2, env._clock.view())
@@ -140,8 +143,8 @@ def main(cfg: DictConfig) -> None:
     orig_cwd = hydra.utils.get_original_cwd()
     model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
     model_path = f'{orig_cwd}/{model_file}'
-    model.set_logger(custom_logger)
     if not os.path.exists(model_path):
+        model.set_logger(custom_logger)
         model.learn(total_timesteps=cfg.run.train_steps)
         model.save(model_file)
     else:
@@ -152,7 +155,8 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
     env.save_history()
-    env.render_all()
+    # env.render_all()
+    render_all(env.env.history, 5)
     quantstats_summary(env.history, agent_name)
 
 
