@@ -99,7 +99,8 @@ def evaluate_policy(model, env, n_eval_episodes: int = 5):
     episode_rewards = []
     episode_profits = []
     for i in range(n_eval_episodes):
-        obs = env.set_to_test_and_reset()
+        env.set_to_test_and_reset()
+        obs = env.reset()
         done = False
         ep_reward = 0
         while not done:
