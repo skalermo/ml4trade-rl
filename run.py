@@ -68,6 +68,12 @@ def get_data_strategies(cfg: DictConfig, weather_df: pd.DataFrame, prices_df: pd
     }
 
 
+def _parse_conf_interval(interval: Union[int, List[Tuple[int, int]]]) -> Union[timedelta, List[Tuple[timedelta, int]]]:
+    if isinstance(interval, int):
+        return timedelta(days=interval)
+    return list(map(lambda x: (timedelta(days=x[0]), x[1]), interval))
+
+
 def setup_sim_env(cfg: DictConfig):
     orig_cwd = hydra.utils.get_original_cwd()
     weather_df = get_weather_df(orig_cwd)
@@ -89,7 +95,7 @@ def setup_sim_env(cfg: DictConfig):
         battery_init_charge=MWh(cfg.env.bat_init_charge),
         battery_efficiency=cfg.env.bat_efficiency,
     )
-    iw_env = IntervalWrapper(env, interval=timedelta(days=30 * 3), split_ratio=0.8)
+    iw_env = IntervalWrapper(env, interval=_parse_conf_interval(cfg.run.interval), split_ratio=0.8)
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
     aw_env = ActionWrapper(iw_env, avg_month_prices, max_power / 2, env._clock.view())
     return aw_env
