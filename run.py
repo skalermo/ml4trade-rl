@@ -17,6 +17,8 @@ from omegaconf import DictConfig, OmegaConf
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common import logger
 
+from src.reward_shaping import RewardShapingEnv
+
 
 def get_weather_df(original_cwd: str) -> pd.DataFrame:
     weather_data_path = f'{original_cwd}/data/.data/weather_unzipped_flattened'
@@ -96,8 +98,9 @@ def setup_sim_env(cfg: DictConfig):
         battery_efficiency=cfg.env.bat_efficiency,
     )
     iw_env = IntervalWrapper(env, interval=_parse_conf_interval(cfg.run.interval), split_ratio=0.8)
+    rs_env = RewardShapingEnv(iw_env, cfg.run.shaping_coef)
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
-    aw_env = ActionWrapper(iw_env, avg_month_prices, max_power / 2, env._clock.view())
+    aw_env = ActionWrapper(rs_env, avg_month_prices, max_power / 2, env._clock.view())
     return aw_env
 
 
