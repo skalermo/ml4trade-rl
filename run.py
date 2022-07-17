@@ -113,7 +113,7 @@ def evaluate_policy(model, env, n_eval_episodes: int = 5):
             obs, rewards, done, info = env.step(action)
             ep_reward += rewards
         episode_rewards.append(ep_reward)
-        episode_profits.append(env.env.env._prosumer.wallet.balance.value)
+        episode_profits.append(env.env.history['wallet_balance'][-1])
     mean_reward = np.mean(episode_rewards)
     std_reward = np.std(episode_rewards)
     mean_profit = np.mean(episode_profits)
@@ -146,9 +146,9 @@ def main(cfg: DictConfig) -> None:
     orig_cwd = hydra.utils.get_original_cwd()
     model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
     model_path = f'{orig_cwd}/{model_file}'
-    model.set_logger(custom_logger)
     if not os.path.exists(model_path):
-        model.learn(total_timesteps=cfg.run.train_steps)
+        model.set_logger(custom_logger)
+        model.learn(total_timesteps=cfg.run.train_steps, log_interval=10)
         model.save(model_file)
     else:
         print(f'Model {model_path} already exists. Skipping training...')
