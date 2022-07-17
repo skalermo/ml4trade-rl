@@ -142,7 +142,7 @@ def main(cfg: DictConfig) -> None:
 
     model = agent_class('MlpPolicy', env,
                         **cfg.agent, verbose=1)
-    custom_logger = logger.configure('.', ['stdout', 'json'])
+    custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
     orig_cwd = hydra.utils.get_original_cwd()
     model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
     model_path = f'{orig_cwd}/{model_file}'

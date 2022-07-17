@@ -3,3 +3,4 @@ pandas
 stable-baselines3
 hydra-core
 quantstats
+tensorboard
