@@ -161,7 +161,9 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
     env.save_history()
-    env.render_all()
+    for n in [2, 4, 30, 430]:
+        save_path = f'last_{n}_days_plot.png'
+        env.render_all(last_n_days=n, save_path=save_path)
     quantstats_summary(env.history, agent_name)
 
 
