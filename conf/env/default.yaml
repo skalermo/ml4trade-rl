@@ -6,7 +6,7 @@ action_time: '00:00:00'
 
 # battery config
 bat_cap: 0.528  # (max_solar_power + max_wind_power) * 48
-bat_efficiency: 0.5
+bat_efficiency: 0.85
 bat_init_charge: 0.05
 
 # wallet config
