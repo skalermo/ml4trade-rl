@@ -134,6 +134,7 @@ def quantstats_summary(env_history, agent_name):
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
 def main(cfg: DictConfig) -> None:
+    logging.info(' '.join(sys.argv))
     agent_name = 'ppo' if any('ppo' in arg for arg in sys.argv) else 'a2c'
     agent_class = {
         'ppo': PPO,
@@ -142,6 +143,8 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'agent={agent_name}')
     logging.info(OmegaConf.to_yaml(cfg))
     env = setup_sim_env(cfg)
+    logging.info(f'action space: {env.action_space.shape}')
+    logging.info(f'observation space: {env.observation_space.shape}')
 
     model = agent_class('MlpPolicy', env,
                         **cfg.agent, verbose=1)
@@ -161,9 +164,10 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
     env.save_history()
-    for n in [2, 4, 30, 430]:
-        save_path = f'last_{n}_days_plot.png'
-        env.render_all(last_n_days=n, save_path=save_path)
+    # for n in [2, 4, 30, 365]:
+    #     save_path = f'last_{n}_days_plot.png'
+    #     env.render_all(last_n_days=n, save_path=save_path)
+    env.render_all()
     quantstats_summary(env.history, agent_name)
 
 
