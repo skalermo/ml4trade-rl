@@ -76,7 +76,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8):
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
 def main(cfg: DictConfig) -> None:
     logging.info(' '.join(sys.argv))
-    agent_name = 'ppo' if any('ppo' in arg for arg in sys.argv) else 'a2c'
+    agent_name = 'a2c' if cfg.agent.get('use_rms_prop') is not None else 'ppo'
     agent_class = {
         'ppo': PPO,
         'a2c': A2C,

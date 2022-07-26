@@ -3,6 +3,7 @@ defaults:
   - env: default
   - run: default
   - _self_
+  - override hydra/launcher: joblib
 
 tag: ''
 

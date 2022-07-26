@@ -2,5 +2,6 @@
 pandas
 stable-baselines3
 hydra-core
+hydra-joblib-launcher
 quantstats
 tensorboard
