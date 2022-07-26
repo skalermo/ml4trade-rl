@@ -26,7 +26,7 @@ def evaluate_policy(model, env: Union[SimulationEnv, Wrapper], n_eval_episodes: 
             obs, rewards, done, info = env.step(action)
             ep_reward += rewards
         episode_rewards.append(ep_reward)
-        episode_profits.append(env.history['wallet_balance'][-1])
+        episode_profits.append(env.history[env.history._cur_tick_to_idx() - 1]['wallet_balance'])
         print(episode_profits[-1])
     mean_reward = np.mean(episode_rewards)
     std_reward = np.std(episode_rewards)
