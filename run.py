@@ -68,9 +68,9 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8):
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
     aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     test_aw_env = ActionWrapper(test_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    rs_env = RewardShapingEnv(aw_env, shaping_coef=cfg.run.shaping_coef)
-    test_rs_env = RewardShapingEnv(test_aw_env, shaping_coef=cfg.run.shaping_coef)
-    return rs_env, test_rs_env
+    # rs_env = RewardShapingEnv(aw_env, shaping_coef=cfg.run.shaping_coef)
+    # test_rs_env = RewardShapingEnv(test_aw_env, shaping_coef=cfg.run.shaping_coef)
+    return aw_env, test_aw_env
 
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
@@ -113,11 +113,9 @@ def main(cfg: DictConfig) -> None:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        # for n in [2, 4, 30]:
-        # for n in [2, 4, 30, 365]:
-        #     save_path = f'last_{n}_days_plot.png'
-            # test_env.render_all(last_n_days=n, save_path=save_path)
-        quantstats_summary(test_env.history, agent_name)
+        for n in [2, 4, 30]:
+            save_path = f'last_{n}_days_plot.png'
+            test_env.render_all(last_n_days=n, n_days_offset=0, save_path=save_path)
 
 
 if __name__ == '__main__':
