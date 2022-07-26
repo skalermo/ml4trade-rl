@@ -5,16 +5,17 @@ scheduling_time: '10:30:00'
 action_time: '00:00:00'
 
 # battery config
-bat_cap: 0.528  # (max_solar_power + max_wind_power) * 48
+bat_cap: 0.864  # (max_solar_power + max_wind_power) * 48
 bat_efficiency: 0.85
-bat_init_charge: 0.05
+bat_init_charge: 0.09  # ~10% of battery
 
 # wallet config
 #init_balance: 10_000
 init_balance: 0
 
 # energy_systems
-max_solar_power: 0.001
+max_solar_power: 0.04
 solar_efficiency: 0.2
 max_wind_power: 0.01
 max_wind_speed: 11
+households: 5
