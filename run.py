@@ -3,7 +3,6 @@ import os
 import sys
 from datetime import datetime, time, timedelta
 from pathlib import Path
-from typing import List, Tuple
 
 import hydra
 from ml4trade.domain.units import *
@@ -23,12 +22,6 @@ from stable_baselines3.common.monitor import Monitor
 from src.evaluation import evaluate_policy
 from src.obs_wrapper import PriceTypeObsWrapper, FilterObsWrapper
 from src.utils import get_weather_df, get_prices_df, get_data_strategies
-
-
-def _parse_conf_interval(interval: Union[int, List[Tuple[int, int]]]) -> Union[timedelta, List[Tuple[timedelta, int]]]:
-    if isinstance(interval, int):
-        return timedelta(days=interval)
-    return list(map(lambda x: (timedelta(days=x[0]), x[1]), interval))
 
 
 def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
@@ -52,7 +45,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     )
     iw_env = IntervalWrapper(
         env,
-        interval=_parse_conf_interval(cfg.run.interval),
+        interval=timedelta(days=cfg.run.interval),
         split_ratio=split_ratio,
         randomly_set_battery=True,
     )
@@ -70,7 +63,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     )
     test_iw_env = IntervalWrapper(
         test_env,
-        interval=_parse_conf_interval(cfg.run.interval),
+        interval=timedelta(days=cfg.run.interval),
         split_ratio=1.0,
         randomly_set_battery=True,
     )
