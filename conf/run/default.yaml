@@ -1,3 +1,5 @@
 train_steps: 1_000
+eval_freq: 5_000
 interval: 90
 shaping_coef: 0
+render_all: True
