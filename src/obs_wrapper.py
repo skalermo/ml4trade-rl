@@ -61,3 +61,19 @@ class PriceTypeObsWrapper(ObservationWrapper):
             # month_types.get(('p1',), 0),
             # month_types.get(('p2',), 0),
         ])))
+
+
+class FilterObsWrapper(ObservationWrapper):
+    env: SimulationEnv
+
+    def __init__(self, env, filter_out_idx: int):
+        super().__init__(env)
+        old_obs_len = self.observation_space.shape[0]
+        self.observation_space = gym.spaces.Box(
+            low=np.array([-np.inf] * (old_obs_len - 1)),
+            high=np.array([np.inf] * (old_obs_len - 1)),
+        )
+        self.filter_out_idx = filter_out_idx
+
+    def observation(self, observation):
+        return observation[:self.filter_out_idx] + observation[self.filter_out_idx + 1:]

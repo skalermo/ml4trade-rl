@@ -12,6 +12,7 @@ from ml4trade.misc import (
     ActionWrapper,
     AvgMonthPriceRetriever,
 )
+from ml4trade.misc.norm_ds_wrapper import DummyWrapper
 from ml4trade.simulation_env import SimulationEnv
 from omegaconf import DictConfig, OmegaConf
 from stable_baselines3 import A2C, PPO
@@ -20,7 +21,7 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
 
 from src.evaluation import evaluate_policy
-from src.obs_wrapper import PriceTypeObsWrapper
+from src.obs_wrapper import PriceTypeObsWrapper, FilterObsWrapper
 from src.utils import get_weather_df, get_prices_df, get_data_strategies
 
 
@@ -31,11 +32,11 @@ def _parse_conf_interval(interval: Union[int, List[Tuple[int, int]]]) -> Union[t
 
 
 def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
-    orig_cwd = hydra.utils.get_original_cwd()
     weather_df = get_weather_df()
     prices_df = get_prices_df()
 
     data_strategies = get_data_strategies(cfg, weather_df, prices_df)
+    data_strategies = {k: DummyWrapper(v) for k, v in data_strategies.items()}
     avg_month_price_retriever = AvgMonthPriceRetriever(prices_df)
 
     env = SimulationEnv(
@@ -77,8 +78,10 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2,
                                 avg_month_price_retriever=avg_month_price_retriever)
-    pto_env = PriceTypeObsWrapper(aw_env, prices_df, aw_env.test_data_start)
-    test_pto = PriceTypeObsWrapper(test_aw_env, prices_df, aw_env.test_data_start)
+    fow_env = FilterObsWrapper(aw_env, 0)
+    test_fow_env = FilterObsWrapper(test_aw_env, 0)
+    pto_env = PriceTypeObsWrapper(fow_env, prices_df, aw_env.test_data_start)
+    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, aw_env.test_data_start)
     if seed is not None:
         pto_env.reset(seed=seed)
         test_pto.reset(seed=seed)
