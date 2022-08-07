@@ -2,8 +2,8 @@ import logging
 import os
 import sys
 from datetime import datetime, time, timedelta
+from pathlib import Path
 from typing import List, Tuple
-import warnings
 
 import hydra
 from ml4trade.domain.units import *
@@ -16,10 +16,12 @@ from ml4trade.simulation_env import SimulationEnv
 from omegaconf import DictConfig, OmegaConf
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common import logger
+from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.monitor import Monitor
 
-from src.reward_shaping import RewardShapingEnv
+from src.evaluation import evaluate_policy
+from src.obs_wrapper import PriceTypeObsWrapper
 from src.utils import get_weather_df, get_prices_df, get_data_strategies
-from src.evaluation import evaluate_policy, quantstats_summary
 
 
 def _parse_conf_interval(interval: Union[int, List[Tuple[int, int]]]) -> Union[timedelta, List[Tuple[timedelta, int]]]:
@@ -28,7 +30,7 @@ def _parse_conf_interval(interval: Union[int, List[Tuple[int, int]]]) -> Union[t
     return list(map(lambda x: (timedelta(days=x[0]), x[1]), interval))
 
 
-def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8):
+def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     orig_cwd = hydra.utils.get_original_cwd()
     weather_df = get_weather_df()
     prices_df = get_prices_df()
@@ -65,54 +67,81 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8):
         battery_efficiency=cfg.env.bat_efficiency,
         start_tick=iw_env.test_data_start_tick,
     )
+    test_iw_env = IntervalWrapper(
+        test_env,
+        interval=_parse_conf_interval(cfg.run.interval),
+        split_ratio=1.0,
+        randomly_set_battery=True,
+    )
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
     aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    test_aw_env = ActionWrapper(test_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    # rs_env = RewardShapingEnv(aw_env, shaping_coef=cfg.run.shaping_coef)
-    # test_rs_env = RewardShapingEnv(test_aw_env, shaping_coef=cfg.run.shaping_coef)
-    return aw_env, test_aw_env
+    test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2,
+                                avg_month_price_retriever=avg_month_price_retriever)
+    pto_env = PriceTypeObsWrapper(aw_env, prices_df, aw_env.test_data_start)
+    test_pto = PriceTypeObsWrapper(test_aw_env, prices_df, aw_env.test_data_start)
+    if seed is not None:
+        pto_env.reset(seed=seed)
+        test_pto.reset(seed=seed)
+    return pto_env, test_pto
 
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
 def main(cfg: DictConfig) -> None:
-    logging.info(' '.join(sys.argv))
     agent_name = 'a2c' if cfg.agent.get('use_rms_prop') is not None else 'ppo'
+
+    with open(Path(__file__), 'r') as f:
+        logging.info(f.read())
+
+    logging.info(' '.join(sys.argv))
+    logging.info(f'agent={agent_name}')
+    logging.info(OmegaConf.to_yaml(cfg))
+
     agent_class = {
         'ppo': PPO,
         'a2c': A2C,
     }[agent_name]
-    logging.info(f'agent={agent_name}')
-    logging.info(OmegaConf.to_yaml(cfg))
 
-    env, test_env = setup_sim_env(cfg, 0.8)
-    logging.info(f'action space: {env.action_space.shape}')
-    logging.info(f'observation space: {env.observation_space.shape}')
-
+    seed = cfg.run.get('seed') or int(datetime.now().timestamp())
+    env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
     model = agent_class('MlpPolicy', env,
-                        **cfg.agent, verbose=1)
+                        **cfg.agent, verbose=1, seed=seed)
+    eval_callback = EvalCallback(Monitor(test_env), best_model_save_path='.',
+                                 log_path='.', eval_freq=cfg.run.eval_freq,
+                                 n_eval_episodes=20, deterministic=True,
+                                 render=False)
 
     orig_cwd = hydra.utils.get_original_cwd()
     model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
     model_path = f'{orig_cwd}/{model_file}'
 
+    logging.info(f'seed: {seed}')
+    logging.info(f'action space: {env.action_space.shape}')
+    logging.info(f'observation space: {env.observation_space.shape}')
+
     if not os.path.exists(model_path):
         custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
         model.set_logger(custom_logger)
         model.learn(total_timesteps=cfg.run.train_steps,
-                    log_interval=max(1, 500 // cfg.agent.n_steps))
+                    log_interval=max(1, 500 // cfg.agent.n_steps),
+                    callback=eval_callback)
         model.save(model_file)
+        print('Training finished.')
+        if cfg.run.train_steps >= cfg.run.eval_freq:
+            print('Loading best model...')
+            model = agent_class.load('best_model', env)
     else:
         print(f'Model {model_path} already exists. Skipping training...')
         model = agent_class.load(model_path, env)
+    # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
 
-    mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=5)
+    test_env.set_interval(timedelta(days=413))
+    mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=3)
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
 
     test_env.save_history()
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+    if cfg.run.render_all:
         for n in [2, 4, 30]:
             save_path = f'last_{n}_days_plot.png'
             test_env.render_all(last_n_days=n, n_days_offset=0, save_path=save_path)
