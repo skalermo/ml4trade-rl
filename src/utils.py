@@ -1,6 +1,7 @@
 import os
 from typing import List, Dict
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -15,13 +16,13 @@ from ml4trade.misc import (
 from omegaconf import DictConfig
 
 
-def get_weather_df(original_cwd: str) -> pd.DataFrame:
-    weather_data_path = f'{original_cwd}/data/.data/weather_unzipped_flattened'
+def get_weather_df() -> pd.DataFrame:
+    weather_data_path = Path(__file__).parent.parent / 'data' / '.data' / 'weather_unzipped_flattened'
 
     def _get_all_scv_filenames(path: str) -> List[str]:
         return [f for f in os.listdir(path) if f.endswith('.csv')]
 
-    filenames = _get_all_scv_filenames(weather_data_path)
+    filenames = _get_all_scv_filenames(str(weather_data_path.absolute()))
     dfs = []
     for f in filenames:
         df = pd.read_csv(f'{weather_data_path}/{f}', header=None, encoding='cp1250',
@@ -36,9 +37,8 @@ def get_weather_df(original_cwd: str) -> pd.DataFrame:
     return weather_df
 
 
-def get_prices_df(original_cwd: str) -> pd.DataFrame:
-    prices_pl_path = f'{original_cwd}/data/.data/prices_pl.csv'
-    # prices_pl_path = f'{original_cwd}/data/.data/test.csv'
+def get_prices_df() -> pd.DataFrame:
+    prices_pl_path = Path(__file__).parent.parent / 'data' / '.data' / 'prices_pl.csv'
     prices_df: pd.DataFrame = pd.read_csv(prices_pl_path, header=0)
     prices_df.fillna(method='bfill', inplace=True)
     prices_df['index'] = pd.to_datetime(prices_df['index'])
@@ -47,7 +47,7 @@ def get_prices_df(original_cwd: str) -> pd.DataFrame:
     help_df = pd.DataFrame(columns=prices_df.columns, index=None)
     for h in range(0, 22 + 1):
         help_df.loc[h] = np.array([datetime(2016, 1, 1, h), 0, 0, 0, 0, 0, 0])
-    prices_df = pd.concat([help_df, prices_df], axis=0)
+    prices_df = pd.concat([help_df, prices_df], axis=0).reset_index()
 
     return prices_df
 

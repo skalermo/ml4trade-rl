@@ -30,8 +30,8 @@ def _parse_conf_interval(interval: Union[int, List[Tuple[int, int]]]) -> Union[t
 
 def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8):
     orig_cwd = hydra.utils.get_original_cwd()
-    weather_df = get_weather_df(orig_cwd)
-    prices_df = get_prices_df(orig_cwd)
+    weather_df = get_weather_df()
+    prices_df = get_prices_df()
 
     data_strategies = get_data_strategies(cfg, weather_df, prices_df)
     avg_month_price_retriever = AvgMonthPriceRetriever(prices_df)
