@@ -9,7 +9,7 @@ except ImportError:
     exit(1)
 
 
-prices_path = Path(__file__).parent / '.data' / 'prices_pl.csv'
+prices_path = Path(__file__).parent.parent / '.data' / 'prices_pl.csv'
 
 
 def _get_prices_df() -> pd.DataFrame:
