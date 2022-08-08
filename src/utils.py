@@ -17,7 +17,7 @@ from omegaconf import DictConfig
 
 
 def get_weather_df() -> pd.DataFrame:
-    weather_data_path = Path(__file__).parent.parent / 'data' / '.data' / 'weather_unzipped_flattened'
+    weather_data_path = Path(__file__).parent.parent / '.data' / 'weather_unzipped_flattened'
 
     def _get_all_scv_filenames(path: str) -> List[str]:
         return [f for f in os.listdir(path) if f.endswith('.csv')]
@@ -38,7 +38,7 @@ def get_weather_df() -> pd.DataFrame:
 
 
 def get_prices_df() -> pd.DataFrame:
-    prices_pl_path = Path(__file__).parent.parent / 'data' / '.data' / 'prices_pl.csv'
+    prices_pl_path = Path(__file__).parent.parent / '.data' / 'prices_pl.csv'
     prices_df: pd.DataFrame = pd.read_csv(prices_pl_path, header=0)
     prices_df.fillna(method='bfill', inplace=True)
     prices_df['index'] = pd.to_datetime(prices_df['index'])
