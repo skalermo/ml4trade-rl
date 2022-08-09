@@ -83,9 +83,11 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
 def main(cfg: DictConfig) -> None:
+    orig_cwd = hydra.utils.get_original_cwd()
+
     agent_name = 'a2c' if cfg.agent.get('use_rms_prop') is not None else 'ppo'
 
-    with open(Path(__file__), 'r') as f:
+    with open(Path(orig_cwd) / __file__, 'r') as f:
         logging.info(f.read())
 
     logging.info(' '.join(sys.argv))
@@ -106,7 +108,6 @@ def main(cfg: DictConfig) -> None:
                                  n_eval_episodes=20, deterministic=True,
                                  render=False)
 
-    orig_cwd = hydra.utils.get_original_cwd()
     model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
     model_path = f'{orig_cwd}/{model_file}'
 
