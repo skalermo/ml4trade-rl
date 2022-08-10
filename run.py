@@ -74,8 +74,8 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
                                 avg_month_price_retriever=avg_month_price_retriever)
     fow_env = FilterObsWrapper(aw_env, 0)
     test_fow_env = FilterObsWrapper(test_aw_env, 0)
-    pto_env = PriceTypeObsWrapper(fow_env, prices_df, aw_env.test_data_start)
-    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, aw_env.test_data_start)
+    pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), aw_env.test_data_start)
+    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), aw_env.test_data_start)
     if seed is not None:
         pto_env.reset(seed=seed)
         test_pto.reset(seed=seed)

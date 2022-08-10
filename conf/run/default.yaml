@@ -3,3 +3,4 @@ eval_freq: 5_000
 interval: 90
 shaping_coef: 0
 render_all: True
+grouping_period: 7
