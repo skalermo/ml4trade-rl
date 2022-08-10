@@ -20,7 +20,8 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
 
 from src.evaluation import evaluate_policy
-from src.obs_wrapper import PriceTypeObsWrapper, FilterObsWrapper
+from src.obs_wrapper import FilterObsWrapper
+from src.price_types_wrapper import PriceTypeObsWrapper
 from src.utils import get_weather_df, get_prices_df, get_data_strategies
 
 
