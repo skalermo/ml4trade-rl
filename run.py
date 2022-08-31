@@ -20,7 +20,8 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
 
 from src.evaluation import evaluate_policy
-from src.obs_wrapper import PriceTypeObsWrapper, FilterObsWrapper
+from src.obs_wrapper import FilterObsWrapper
+from src.ds_wrapper import TemperatureDsWrapper
 from src.utils import get_weather_df, get_prices_df, get_data_strategies
 
 
@@ -30,6 +31,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
 
     data_strategies = get_data_strategies(cfg, weather_df, prices_df)
     data_strategies = {k: DummyWrapper(v) for k, v in data_strategies.items()}
+    data_strategies['production'] = TemperatureDsWrapper(data_strategies['production'])
     avg_month_price_retriever = AvgMonthPriceRetriever(prices_df)
 
     env = SimulationEnv(
@@ -71,14 +73,17 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2,
                                 avg_month_price_retriever=avg_month_price_retriever)
-    fow_env = FilterObsWrapper(aw_env, 0)
-    test_fow_env = FilterObsWrapper(test_aw_env, 0)
-    pto_env = PriceTypeObsWrapper(fow_env, prices_df, aw_env.test_data_start)
-    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, aw_env.test_data_start)
+    fow_env = FilterObsWrapper(aw_env, 1)
+    test_fow_env = FilterObsWrapper(test_aw_env, 1)
+    # pto_env = PriceTypeObsWrapper(fow_env, prices_df, aw_env.test_data_start)
+    # test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, aw_env.test_data_start)
+
+    res_env = fow_env
+    test_res_env = test_fow_env
     if seed is not None:
-        pto_env.reset(seed=seed)
-        test_pto.reset(seed=seed)
-    return pto_env, test_pto
+        res_env.reset(seed=seed)
+        test_res_env.reset(seed=seed)
+    return res_env, test_res_env
 
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
