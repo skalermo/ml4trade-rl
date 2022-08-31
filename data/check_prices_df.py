@@ -29,10 +29,12 @@ def check_df(fix: bool = False):
     while cur < end:
         idx = np.where(df['index'] == cur)[0]
         while not len(idx):
+            print(f'Found missing data for {cur}.')
             price_before = df.at[i - 1, col]
             price_after = df.at[i + 1, col]
             price_avg = round((price_before + price_after) / 2, ndigits=2)
             if fix:
+                print(f'Filling in data for {cur}.')
                 columns = df.columns
                 df = pd.DataFrame(np.insert(df.values, i, values=[cur, price_avg, 0, 0, 0, 0, 0], axis=0))
                 i += 1
