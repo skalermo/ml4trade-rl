@@ -36,6 +36,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         data_strategies,
         start_datetime=datetime.fromisoformat(cfg.env.start),
         end_datetime=datetime.fromisoformat(cfg.env.end),
+        # end_datetime=datetime.fromisoformat(cfg.env.end) - timedelta(days=90),
         scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
         action_replacement_time=time.fromisoformat(cfg.env.action_time),
         prosumer_init_balance=Currency(cfg.env.init_balance),
@@ -46,12 +47,14 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     iw_env = IntervalWrapper(
         env,
         interval=timedelta(days=cfg.run.interval),
-        split_ratio=split_ratio,
+        # split_ratio=split_ratio,
+        split_ratio=1.0,
         randomly_set_battery=True,
     )
     test_env = SimulationEnv(
         data_strategies,
-        start_datetime=iw_env.test_data_start,
+        # start_datetime=iw_env.test_data_start,
+        start_datetime=datetime.fromisoformat(cfg.env.end) - timedelta(days=90),
         end_datetime=datetime.fromisoformat(cfg.env.end),
         scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
         action_replacement_time=time.fromisoformat(cfg.env.action_time),
@@ -68,7 +71,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         randomly_set_battery=True,
     )
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
-    aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+    aw_env = ActionWrapper(env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2,
                                 avg_month_price_retriever=avg_month_price_retriever)
     fow_env = FilterObsWrapper(aw_env, 0)
@@ -115,33 +118,36 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'action space: {env.action_space.shape}')
     logging.info(f'observation space: {env.observation_space.shape}')
 
-    if not os.path.exists(model_path):
-        custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
-        model.set_logger(custom_logger)
-        model.learn(total_timesteps=cfg.run.train_steps,
-                    log_interval=max(1, 500 // cfg.agent.n_steps),
-                    callback=eval_callback)
-        model.save(model_file)
-        print('Training finished.')
-        if cfg.run.train_steps >= cfg.run.eval_freq:
-            print('Loading best model...')
-            model = agent_class.load('best_model', env)
-    else:
-        print(f'Model {model_path} already exists. Skipping training...')
-        model = agent_class.load(model_path, env)
+    # if not os.path.exists(model_path):
+    #     custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
+    #     model.set_logger(custom_logger)
+    #     model.learn(total_timesteps=cfg.run.train_steps,
+    #                 log_interval=max(1, 500 // cfg.agent.n_steps),
+    #                 callback=eval_callback)
+    #     model.save(model_file)
+    #     print('Training finished.')
+    #     if cfg.run.train_steps >= cfg.run.eval_freq:
+    #         print('Loading best model...')
+    #         model = agent_class.load('best_model', env)
+    # else:
+    #     print(f'Model {model_path} already exists. Skipping training...')
+    #     model = agent_class.load(model_path, env)
     # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
 
-    test_env.set_interval(timedelta(days=413))
-    mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=3)
+    # test_env.set_interval(timedelta(days=413))
+    # mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=3)
+    mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, env, n_eval_episodes=1)
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
 
-    test_env.save_history()
+    # test_env.save_history()
+    env.save_history()
 
     if cfg.run.render_all:
-        for n in [2, 4, 30]:
+        for n in [2, 4, 10, 30]:
             save_path = f'last_{n}_days_plot.png'
-            test_env.render_all(last_n_days=n, n_days_offset=0, save_path=save_path)
+            # test_env.render_all(last_n_days=n, n_days_offset=0, save_path=save_path)
+            env.render_all(last_n_days=n, n_days_offset=0, save_path=save_path)
 
 
 if __name__ == '__main__':
