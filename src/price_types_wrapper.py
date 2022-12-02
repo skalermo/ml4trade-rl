@@ -21,8 +21,8 @@ class PriceTypeObsWrapper(ObservationWrapper):
         super().__init__(env)
         old_obs_len = self.observation_space.shape[0]
         self.observation_space = gym.spaces.Box(
-            low=np.array([-np.inf] * old_obs_len + [0] * 3),
-            high=np.array([np.inf] * old_obs_len + [1] * 3),
+            low=np.array([-np.inf] * old_obs_len + [0] * 2),
+            high=np.array([np.inf] * old_obs_len + [1] * 2),
         )
         self.test_data_start = test_data_start
 
@@ -84,7 +84,7 @@ class PriceTypeObsWrapper(ObservationWrapper):
         tomorrow = self.env.new_clock_view().cur_datetime() + timedelta(days=1)
         prices_types = self._get_classes_count(tomorrow - self.period_unit)
         return np.concatenate((observation, np.array([
-            prices_types.get(('p0',), 0),
+            # prices_types.get(('p0',), 0),
             prices_types.get(('p1',), 0),
             prices_types.get(('p2',), 0),
         ])))
