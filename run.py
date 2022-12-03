@@ -12,6 +12,7 @@ from ml4trade.misc import (
     AvgMonthPriceRetriever,
 )
 from ml4trade.misc.norm_ds_wrapper import DummyWrapper
+from ml4trade.misc.hourly_steps_wrapper import HourlyStepsWrapper
 from ml4trade.simulation_env import SimulationEnv
 from omegaconf import DictConfig, OmegaConf
 
@@ -95,19 +96,22 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         split_ratio=1.0,
         randomly_set_battery=True,
     )
-    max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
-    aw_env = ActionWrapper(env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    fow_env = FilterObsWrapper(aw_env, 0)
-    eval_fow_env = FilterObsWrapper(eval_aw_env, 0)
-    test_fow_env = FilterObsWrapper(test_aw_env, 0)
-    pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
-    eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
-    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
-    res_env = pto_env
-    res_eval_env = eval_pto
-    res_test_env = test_pto
+    # max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
+    # aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+    # eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+    # test_aw_env = ActionWrapper(test_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+    # fow_env = FilterObsWrapper(aw_env, 0)
+    # eval_fow_env = FilterObsWrapper(eval_aw_env, 0)
+    # test_fow_env = FilterObsWrapper(test_aw_env, 0)
+    # pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    # eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    # test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    res_env = HourlyStepsWrapper(iw_env)
+    res_eval_env = HourlyStepsWrapper(eval_iw_env)
+    res_test_env = HourlyStepsWrapper(test_iw_env)
+    # res_env = pto_env
+    # res_eval_env = eval_pto
+    # res_test_env = test_pto
     if seed is not None:
         res_env.reset(seed=seed)
         res_eval_env.reset(seed=seed)
@@ -139,7 +143,7 @@ def main(cfg: DictConfig) -> None:
                         **cfg.agent, verbose=1, seed=seed)
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
                                  log_path='.', eval_freq=cfg.run.eval_freq,
-                                 n_eval_episodes=20, deterministic=True,
+                                 n_eval_episodes=5, deterministic=True,
                                  render=False)
 
     model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
@@ -165,7 +169,6 @@ def main(cfg: DictConfig) -> None:
         model = agent_class.load(model_path, env)
     # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
 
-    test_env.set_interval(timedelta(days=90))
     mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=3)
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
