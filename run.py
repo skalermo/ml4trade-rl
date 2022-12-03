@@ -36,7 +36,8 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     env = SimulationEnv(
         data_strategies,
         start_datetime=datetime.fromisoformat(cfg.env.start),
-        end_datetime=datetime.fromisoformat(cfg.env.end),
+        # end_datetime=datetime.fromisoformat(cfg.env.end),
+        end_datetime=datetime.fromisoformat(cfg.env.end) - timedelta(days=90 * 2),
         scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
         action_replacement_time=time.fromisoformat(cfg.env.action_time),
         prosumer_init_balance=Currency(cfg.env.init_balance),
@@ -47,13 +48,15 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     iw_env = IntervalWrapper(
         env,
         interval=timedelta(days=cfg.run.interval),
-        split_ratio=split_ratio,
+        # split_ratio=split_ratio,
+        split_ratio=1.0,
         randomly_set_battery=True,
     )
-    test_env = SimulationEnv(
+    eval_env = SimulationEnv(
         data_strategies,
-        start_datetime=iw_env.test_data_start,
-        end_datetime=datetime.fromisoformat(cfg.env.end),
+        start_datetime=datetime.fromisoformat(cfg.env.end) - timedelta(days=90 * 2),
+        # end_datetime=datetime.fromisoformat(cfg.env.end),
+        end_datetime=datetime.fromisoformat(cfg.env.end) - timedelta(days=90),
         scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
         action_replacement_time=time.fromisoformat(cfg.env.action_time),
         prosumer_init_balance=Currency(cfg.env.init_balance),
@@ -62,6 +65,27 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         battery_efficiency=cfg.env.bat_efficiency,
         start_tick=iw_env.test_data_start_tick,
     )
+    eval_iw_env = IntervalWrapper(
+        eval_env,
+        interval=timedelta(days=cfg.run.interval),
+        # split_ratio=split_ratio,
+        split_ratio=1.0,
+        randomly_set_battery=True,
+    )
+
+    test_env = SimulationEnv(
+        data_strategies,
+        # start_datetime=iw_env.test_data_start,
+        start_datetime=datetime.fromisoformat(cfg.env.end) - timedelta(days=90),
+        end_datetime=datetime.fromisoformat(cfg.env.end),
+        scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
+        action_replacement_time=time.fromisoformat(cfg.env.action_time),
+        prosumer_init_balance=Currency(cfg.env.init_balance),
+        battery_capacity=MWh(cfg.env.bat_cap),
+        battery_init_charge=MWh(cfg.env.bat_init_charge),
+        battery_efficiency=cfg.env.bat_efficiency,
+        start_tick=eval_iw_env.test_data_start_tick,
+    )
     test_iw_env = IntervalWrapper(
         test_env,
         interval=timedelta(days=cfg.run.interval),
@@ -69,17 +93,23 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         randomly_set_battery=True,
     )
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
-    aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2,
-                                avg_month_price_retriever=avg_month_price_retriever)
+    aw_env = ActionWrapper(env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+    eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+    test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     fow_env = FilterObsWrapper(aw_env, 0)
+    eval_fow_env = FilterObsWrapper(eval_aw_env, 0)
     test_fow_env = FilterObsWrapper(test_aw_env, 0)
-    pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), aw_env.test_data_start)
-    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), aw_env.test_data_start)
+    pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    res_env = pto_env
+    res_eval_env = eval_pto
+    res_test_env = test_pto
     if seed is not None:
-        pto_env.reset(seed=seed)
-        test_pto.reset(seed=seed)
-    return pto_env, test_pto
+        res_env.reset(seed=seed)
+        res_eval_env.reset(seed=seed)
+        res_test_env.reset(seed=seed)
+    return res_env, res_eval_env, res_test_env
 
 
 @hydra.main(config_path='conf', config_name='config', version_base='1.1')
@@ -101,10 +131,10 @@ def main(cfg: DictConfig) -> None:
     }[agent_name]
 
     seed = cfg.run.get('seed') or int(datetime.now().timestamp())
-    env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
+    env, eval_env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
     model = agent_class('MlpPolicy', env,
                         **cfg.agent, verbose=1, seed=seed)
-    eval_callback = EvalCallback(Monitor(test_env), best_model_save_path='.',
+    eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
                                  log_path='.', eval_freq=cfg.run.eval_freq,
                                  n_eval_episodes=20, deterministic=True,
                                  render=False)
@@ -132,7 +162,7 @@ def main(cfg: DictConfig) -> None:
         model = agent_class.load(model_path, env)
     # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
 
-    test_env.set_interval(timedelta(days=413))
+    test_env.set_interval(timedelta(days=90))
     mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=3)
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
@@ -140,7 +170,7 @@ def main(cfg: DictConfig) -> None:
     test_env.save_history()
 
     if cfg.run.render_all:
-        for n in [2, 4, 30]:
+        for n in [2, 4, 10, 30]:
             save_path = f'last_{n}_days_plot.png'
             test_env.render_all(last_n_days=n, n_days_offset=0, save_path=save_path)
 

@@ -1,21 +1,31 @@
 # time config
 start: '2016-01-01 00:00:00'
-end: '2021-09-01 00:00:00'
+end: '2020-01-01 00:00:00'
+#end: '2022-01-01 00:00:00'
+#test_start = 2020-01-01 - 90 days
 scheduling_time: '10:30:00'
 action_time: '00:00:00'
 
 # battery config
-bat_cap: 0.864  # (max_solar_power + max_wind_power) * 48
+#bat_cap: 0.864  # (max_solar_power + max_wind_power) * 48
+bat_cap: 2.0
 bat_efficiency: 0.85
-bat_init_charge: 0.09  # ~10% of battery
+#bat_init_charge: 0.09  # ~10% of battery
+bat_init_charge: 0.2  # 10% of battery
 
 # wallet config
 #init_balance: 10_000
 init_balance: 0
 
 # energy_systems
-max_solar_power: 0.04
+#max_solar_power: 0.04
+max_solar_power: 0.4
+#max_solar_power: 1.0
 solar_efficiency: 0.2
-max_wind_power: 0.01
+#solar_efficiency: 0.08
+#max_wind_power: 0.01
+max_wind_power: 0.05
+#max_wind_power: 0.08
 max_wind_speed: 11
-households: 5
+#households: 5
+households: 100
