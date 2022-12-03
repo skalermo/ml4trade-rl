@@ -18,13 +18,14 @@ def evaluate_policy(model, env: Union[SimulationEnv, Wrapper], n_eval_episodes: 
     episode_rewards = []
     episode_profits = []
     for i in range(n_eval_episodes):
-        obs = env.reset()
+        obs, _ = env.reset()
         done = False
         ep_reward = 0
         while not done:
-            action, _states = model.predict(obs, deterministic=True)
-            obs, rewards, done, info = env.step(action)
-            ep_reward += rewards
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
+            ep_reward += reward
         episode_rewards.append(ep_reward)
         episode_profits.append(env.history[env.history._cur_tick_to_idx() - 1]['wallet_balance'])
         print(episode_profits[-1])
