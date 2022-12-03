@@ -20,7 +20,8 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
 
 from src.evaluation import evaluate_policy
-from src.obs_wrapper import PriceTypeObsWrapper, FilterObsWrapper
+from src.obs_wrapper import FilterObsWrapper
+from src.price_types_wrapper import PriceTypeObsWrapper
 from src.utils import get_weather_df, get_prices_df, get_data_strategies
 
 
@@ -98,9 +99,9 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     fow_env = FilterObsWrapper(aw_env, 0)
     eval_fow_env = FilterObsWrapper(eval_aw_env, 0)
     test_fow_env = FilterObsWrapper(test_aw_env, 0)
-    pto_env = PriceTypeObsWrapper(fow_env, prices_df, eval_aw_env.test_data_start)
-    eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, eval_aw_env.test_data_start)
-    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, eval_aw_env.test_data_start)
+    pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
     res_env = pto_env
     res_eval_env = eval_pto
     res_test_env = test_pto
