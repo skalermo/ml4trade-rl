@@ -96,7 +96,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         randomly_set_battery=True,
     )
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
-    aw_env = ActionWrapper(env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+    aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     fow_env = FilterObsWrapper(aw_env, 0)
@@ -139,7 +139,7 @@ def main(cfg: DictConfig) -> None:
                         **cfg.agent, verbose=1, seed=seed)
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
                                  log_path='.', eval_freq=cfg.run.eval_freq,
-                                 n_eval_episodes=20, deterministic=True,
+                                 n_eval_episodes=2, deterministic=True,
                                  render=False)
 
     model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
