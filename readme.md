@@ -27,13 +27,6 @@ bash data/download_all.sh
 Necessary files will be downloaded, unpacked and stored in
 automatically created `.data/` directory.
 
-## Testing
-
-You can run tests stored in `test/` directory to see if everything works
-as expected:
-```bash
-python -m unittest discover test
-```
 
 ## Usage
 
@@ -43,11 +36,10 @@ taken from [conf/](conf) directory. They are proven to give good results, but
 you can override them if needed. Seed can be optionally provided by
 `+run.seed=your_seed_here`, otherwise it is acquired from current datetime.
 
-For example, given you want to run `A2C` algorithm for `1,000,000` time steps
-with `n_steps` parameter set to `50` and `seed` set to `42`:
+For example, given you want to run `FARL` algorithm for `1,000,000` time steps:
 
 ```bash
-python run.py agent=a2c run.train_steps=1e6 agent.n_steps=50 +run.seed=42
+python run.py agent=farl run.train_steps=1e6
 ```
 
 All parameters stored in [conf/](conf) are configurable.

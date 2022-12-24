@@ -1,5 +1,5 @@
 defaults:
-  - agent: ppo
+  - agent: farl
   - env: default
   - run: default
   - _self_

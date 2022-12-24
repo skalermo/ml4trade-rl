@@ -5,6 +5,7 @@ from datetime import datetime, time, timedelta
 from pathlib import Path
 
 import hydra
+from farl.farl import FARL
 from ml4trade.domain.units import *
 from ml4trade.misc import (
     IntervalWrapper,
@@ -123,8 +124,8 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
 def main(cfg: DictConfig) -> None:
     orig_cwd = hydra.utils.get_original_cwd()
 
-    agent_name = 'a2c' if cfg.agent.get('use_rms_prop') is not None else 'ppo'
-
+    agent_name = 'farl' if cfg.agent.get('exploration_initial_eps') is not None \
+        else ('a2c' if cfg.agent.get('use_rms_prop') is not None else 'ppo')
     with open(Path(orig_cwd) / __file__, 'r') as f:
         logging.info(f.read())
 
@@ -135,12 +136,16 @@ def main(cfg: DictConfig) -> None:
     agent_class = {
         'ppo': PPO,
         'a2c': A2C,
+        'farl': FARL
     }[agent_name]
 
     seed = cfg.run.get('seed') or int(datetime.now().timestamp())
     env, eval_env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
-    model = agent_class('MlpPolicy', env,
-                        **cfg.agent, verbose=1, seed=seed)
+    if agent_name == 'farl':
+        model = agent_class(env, **cfg.agent, verbose=True)
+    else:
+        model = agent_class('MlpPolicy', env,
+                            **cfg.agent, verbose=1, seed=seed)
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
                                  log_path='.', eval_freq=cfg.run.eval_freq,
                                  n_eval_episodes=5, deterministic=True,
@@ -154,11 +159,14 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'observation space: {env.observation_space.shape}')
 
     if not os.path.exists(model_path):
-        custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
-        model.set_logger(custom_logger)
-        model.learn(total_timesteps=cfg.run.train_steps,
-                    log_interval=max(1, 500 // cfg.agent.n_steps),
-                    callback=eval_callback)
+        if agent_name == 'farl':
+            model.learn(total_timesteps=cfg.run.train_steps)
+        else:
+            custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
+            model.set_logger(custom_logger)
+            model.learn(total_timesteps=cfg.run.train_steps,
+                        log_interval=max(1, 500 // cfg.agent.n_steps),
+                        callback=eval_callback)
         model.save(model_file)
         print('Training finished.')
         if cfg.run.train_steps >= cfg.run.eval_freq:
