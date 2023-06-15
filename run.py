@@ -133,7 +133,9 @@ def main(cfg: DictConfig) -> None:
         'a2c': A2C,
     }[agent_name]
 
-    seed = cfg.run.get('seed') or int(datetime.now().timestamp())
+    seed = cfg.run.get('seed')
+    if seed is None:
+        seed = int(datetime.now().timestamp())
     env, eval_env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
     model = agent_class('MlpPolicy', env,
                         **cfg.agent, verbose=1, seed=seed)
