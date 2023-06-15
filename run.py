@@ -170,7 +170,7 @@ def main(cfg: DictConfig) -> None:
         model = agent_class.load(model_path, env)
     # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
 
-    test_env.set_interval(timedelta(days=90))
+    # test_env.set_interval(timedelta(days=90))
     mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=3)
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
