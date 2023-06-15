@@ -99,15 +99,18 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    fow_env = FilterObsWrapper(aw_env, 0)
-    eval_fow_env = FilterObsWrapper(eval_aw_env, 0)
-    test_fow_env = FilterObsWrapper(test_aw_env, 0)
-    pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
-    eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
-    test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
-    res_env = pto_env
-    res_eval_env = eval_pto
-    res_test_env = test_pto
+    fow_env = FilterObsWrapper(aw_env, -2)
+    eval_fow_env = FilterObsWrapper(eval_aw_env, -2)
+    test_fow_env = FilterObsWrapper(test_aw_env, -2)
+    # pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    # eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    # test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    # res_env = pto_env
+    # res_eval_env = eval_pto
+    # res_test_env = test_pto
+    res_env = fow_env
+    res_eval_env = eval_fow_env
+    res_test_env = test_fow_env
     if seed is not None:
         res_env.reset(seed=seed)
         res_eval_env.reset(seed=seed)
