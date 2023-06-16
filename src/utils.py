@@ -15,6 +15,8 @@ from ml4trade.misc import (
 )
 from omegaconf import DictConfig
 
+from src.obs_wrapper import WindWrapper, SolarWrapper
+
 
 def get_weather_df() -> pd.DataFrame:
     weather_data_path = Path(__file__).parent.parent / '.data' / 'weather_unzipped_flattened'
@@ -56,12 +58,15 @@ def get_data_strategies(cfg: DictConfig, weather_df: pd.DataFrame, prices_df: pd
     weather_strat = ImgwDataStrategy(weather_df, window_size=24, window_direction='forward',
                                      max_solar_power=cfg.env.max_solar_power, solar_efficiency=cfg.env.solar_efficiency,
                                      max_wind_power=cfg.env.max_wind_power, max_wind_speed=cfg.env.max_wind_speed)
-    weather_strat.imgwWindDataStrategy = WeatherWrapper(
+    weather_strat.imgwWindDataStrategy = WindWrapper(
+    # weather_strat.imgwWindDataStrategy = WeatherWrapper(
         ImgwWindDataStrategy(weather_df, window_size=24,
                              max_wind_power=MW(cfg.env.max_wind_power), max_wind_speed=cfg.env.max_wind_speed,
-                             window_direction='forward')
+                             window_direction='forward'),
+        max_wind_speed=cfg.env.max_wind_speed,
     )
-    weather_strat.imgwSolarDataStrategy = WeatherWrapper(
+    weather_strat.imgwSolarDataStrategy = SolarWrapper(
+    # weather_strat.imgwSolarDataStrategy = WeatherWrapper(
         ImgwSolarDataStrategy(weather_df, window_size=24,
                               max_solar_power=MW(cfg.env.max_solar_power), solar_efficiency=cfg.env.solar_efficiency,
                               window_direction='forward')

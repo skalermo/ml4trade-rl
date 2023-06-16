@@ -1,6 +1,10 @@
+from typing import List
+
 import gym
 from gym import ObservationWrapper
 import numpy as np
+from ml4trade.data_strategies import ImgwSolarDataStrategy, ImgwWindDataStrategy
+from ml4trade.misc.norm_ds_wrapper import DataStrategyWrapper
 from ml4trade.simulation_env import SimulationEnv
 
 
@@ -42,3 +46,29 @@ class FilterObsWrapper(ObservationWrapper):
 
     def observation(self, observation):
         return observation[:self.filter_out_idx] + observation[self.filter_out_idx + 1:]
+
+
+class WindWrapper(DataStrategyWrapper):
+    def __init__(self, ds: ImgwWindDataStrategy, max_wind_speed: float):
+        super().__init__(ds)
+        self.max_wind_speed = max_wind_speed
+
+    def observation(self, idx: int) -> List[float]:
+        obs = self.ds.observation(idx)
+        return self._minmax_scale(obs)
+
+    def _minmax_scale(self, obs: list):
+        return list(map(lambda x: x / self.max_wind_speed if x <= self.max_wind_speed else 0, obs))
+
+
+class SolarWrapper(DataStrategyWrapper):
+    def __init__(self, ds: ImgwSolarDataStrategy):
+        super().__init__(ds)
+        self.max_octant_value = 8
+
+    def observation(self, idx: int) -> List[float]:
+        obs = self.ds.observation(idx)
+        return self._minmax_scale(obs)
+
+    def _minmax_scale(self, obs: list):
+        return list(map(lambda x: x / self.max_octant_value if x <= self.max_octant_value else 1, obs))
