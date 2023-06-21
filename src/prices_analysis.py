@@ -1,4 +1,5 @@
-from datetime import datetime, date
+from datetime import datetime, timedelta
+import math
 
 import numpy as np
 import pandas as pd
@@ -18,7 +19,7 @@ def avg_price(df, name=''):
 
     plt.xticks(range(0, 24))
 
-    plt.legend()
+    # plt.legend()
     plt.show()
     # plt.savefig(name)
 
@@ -114,29 +115,46 @@ def get_day_hilos(arr: pd.Series):
     evening_high = np.argmax(arr[day_low:]) + day_low
     return night_low, morning_high, day_low, evening_high, \
         arr[night_low], arr[morning_high], arr[day_low], arr[evening_high], \
-        analyze_hilos(mhv=arr[morning_high], dlv=arr[day_low], ehv=arr[evening_high])
+        analyze_hilos(mh=arr[morning_high], dl=arr[day_low], eh=arr[evening_high])
 
 
-def analyze_hilos(mhv, dlv, ehv, bat_eff=0.85):
+def analyze_hilos(mh, dl, eh):
     margin = 0.1
-    dlv *= (1 / bat_eff)
-    if dlv >= mhv * (1 - margin) and dlv >= ehv * (1 - margin):
-        # return '1p0'
-        return 'p0'
-    if dlv >= mhv * (1 - margin):
-        # return '1p2'
-        return 'p2'
-    if dlv >= ehv * (1 - margin):
-        # return '1p1'
-        return 'p1'
-    if mhv < ehv * (1 - margin):
-        # return '2p2'
-        return 'p2'
-    if ehv < mhv * (1 - margin):
-        # return '2p1'
-        return 'p1'
-    # return '2p0'
-    return 'p0'
+
+    def gt(a: float, b: float) -> bool:
+        return a > b and not math.isclose(a, b, rel_tol=margin, abs_tol=0.0)
+
+    if gt(mh, dl):
+        if gt(mh, eh):
+            if gt(dl, eh):
+                return '321'
+            elif gt(eh, dl):
+                return '312'
+            else:  # dl == eh
+                return '211'
+        elif gt(eh, mh):
+            return '213'
+        else:  # mh == eh
+            return '212'
+    elif gt(dl, mh):
+        if gt(mh, eh):
+            return '231'
+        elif gt(eh, mh):
+            if gt(dl, eh):
+                return '132'
+            elif gt(eh, dl):
+                return '123'
+            else:  # dl == eh
+                return '122'
+        else:  # mh == eh
+            return '121'
+    else:  # mh == dl
+        if gt(mh, eh):
+            return '221'
+        elif gt(eh, mh):
+            return '112'
+        else:  # mh == eh
+            return '111'
 
 
 def prices_diff_profit_per_mwh(nlv, mhv, dlv, ehv, bat_eff):
