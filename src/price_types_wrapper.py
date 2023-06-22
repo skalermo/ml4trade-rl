@@ -17,7 +17,8 @@ YEAR = timedelta(days=365)
 class PriceTypeObsWrapper(ObservationWrapper):
     env: SimulationEnv
 
-    def __init__(self, env, df: pd.DataFrame, grouping_period: timedelta, test_data_start: datetime):
+    def __init__(self, env, df: pd.DataFrame, grouping_period: timedelta, test_data_start: datetime,
+                 use_future: bool = False):
         super().__init__(env)
         old_obs_len = self.observation_space.shape[0]
         self.observation_space = gym.spaces.Box(
@@ -25,8 +26,10 @@ class PriceTypeObsWrapper(ObservationWrapper):
             high=np.array([np.inf] * old_obs_len + [1] * 6),
         )
         self.test_data_start = test_data_start
+        self.use_future = use_future
 
         days_classified = get_prices_optimums(df)
+        self.classes = days_classified[['date', 'cls']]
         self.period_unit: timedelta = YEAR if grouping_period >= YEAR else WEEK
         self.groupings, self.default_grouping = self._precalculate_groupings(days_classified, grouping_period)
 
@@ -81,15 +84,18 @@ class PriceTypeObsWrapper(ObservationWrapper):
         return res
 
     def observation(self, observation):
+        classes = ['111', '212', '112', '211', '213', '312']
+
         tomorrow = self.env.new_clock_view().cur_datetime() + timedelta(days=1)
-        prices_types = self._get_classes_count(tomorrow - self.period_unit)
-        stats = np.array([
-            prices_types.get('111', 0),
-            prices_types.get('212', 0),
-            prices_types.get('112', 0),
-            prices_types.get('211', 0),
-            prices_types.get('213', 0),
-            prices_types.get('312', 0),
-        ])
+
+        if self.use_future:
+            c = self.classes[self.classes['date'] == tomorrow.replace(hour=0)].head(1)['cls'].item()
+            prices_types = {c: 1.0}
+        else:
+            prices_types = self._get_classes_count(tomorrow - self.period_unit)
+
+        stats = np.zeros(len(classes))
+        for i, cls in enumerate(classes):
+            stats[i] = prices_types.get(cls, 0)
 
         return np.concatenate((observation, stats))
