@@ -19,10 +19,11 @@ import gymnasium
 sys.modules["gym"] = gymnasium
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common import logger
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 
+from src.curriculum import CurriculumCallback, ReportBateffCallback
 from src.evaluation import evaluate_policy
 from src.obs_wrapper import FilterObsWrapper
 from src.price_types_wrapper import PriceTypeObsWrapper
@@ -37,7 +38,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     data_strategies = {k: DummyWrapper(v) for k, v in data_strategies.items()}
     avg_month_price_retriever = AvgMonthPriceRetriever(prices_df)
 
-    def create_train_env():
+    def create_train_env(random_bat_eff: bool = False):
         env = SimulationEnv(
             data_strategies,
             start_datetime=datetime.fromisoformat(cfg.env.start),
@@ -55,6 +56,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
             # split_ratio=split_ratio,
             split_ratio=1.0,
             randomly_set_battery=True,
+            random_bat_eff=random_bat_eff,
         )
         aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
         fow_env = FilterObsWrapper(aw_env, -2)
@@ -78,6 +80,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         # split_ratio=split_ratio,
         split_ratio=1.0,
         randomly_set_battery=True,
+        random_bat_eff=True,
     )
     eval_env = SimulationEnv(
         data_strategies,
@@ -98,6 +101,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         # split_ratio=split_ratio,
         split_ratio=1.0,
         randomly_set_battery=True,
+        random_bat_eff=True,
     )
 
     test_env = SimulationEnv(
@@ -133,15 +137,16 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     # res_eval_env = eval_pto
     # res_test_env = test_pto
 
-    # res_env = fow_env
-    res_env = VecMonitor(DummyVecEnv(
-        [lambda: create_train_env()] * cfg.run.train_envs,
-    ))
+    res_env = fow_env
+    # res_env = VecMonitor(DummyVecEnv(
+    #     [lambda: create_train_env(random_bat_eff=True)] * cfg.run.train_envs,
+    # ))
     res_eval_env = eval_fow_env
     res_test_env = test_fow_env
     if seed is not None:
         if isinstance(res_env, VecMonitor):
             res_env.seed(seed=seed)
+            res_env.reset()
         else:
             res_env.reset(seed=seed)
         res_eval_env.reset(seed=seed)
@@ -173,10 +178,11 @@ def main(cfg: DictConfig) -> None:
     env, eval_env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
     model = agent_class('MlpPolicy', env,
                         **cfg.agent, verbose=1, seed=seed)
+    cc = CurriculumCallback(env.env.env, eval_env.env.env)
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
                                  log_path='.', eval_freq=cfg.run.eval_freq,
-                                 n_eval_episodes=2, deterministic=True,
-                                 render=False)
+                                 n_eval_episodes=10, deterministic=True,
+                                 render=False, callback_on_new_best=cc)
 
     model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
     model_path = f'{orig_cwd}/{model_file}'
@@ -188,9 +194,18 @@ def main(cfg: DictConfig) -> None:
     if not os.path.exists(model_path):
         custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
         model.set_logger(custom_logger)
-        model.learn(total_timesteps=cfg.run.train_steps,
-                    log_interval=max(1, 500 // cfg.agent.n_steps),
-                    callback=eval_callback)
+
+        cbs = [
+            eval_callback,
+            ReportBateffCallback(env.env.env.env._prosumer.battery),
+        ]
+        model.learn(
+            total_timesteps=cfg.run.train_steps,
+            # log_interval=max(1, 500 // cfg.agent.n_steps),
+            log_interval=1,
+            callback=CallbackList(cbs),
+            reset_num_timesteps=False,
+        )
         model.save(model_file)
         print('Training finished.')
         if cfg.run.train_steps >= cfg.run.eval_freq:
