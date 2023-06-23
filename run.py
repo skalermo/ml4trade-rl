@@ -21,6 +21,7 @@ from stable_baselines3 import A2C, PPO
 from stable_baselines3.common import logger
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 
 from src.evaluation import evaluate_policy
 from src.obs_wrapper import FilterObsWrapper
@@ -35,6 +36,29 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     data_strategies = get_data_strategies(cfg, weather_df, prices_df)
     data_strategies = {k: DummyWrapper(v) for k, v in data_strategies.items()}
     avg_month_price_retriever = AvgMonthPriceRetriever(prices_df)
+
+    def create_train_env():
+        env = SimulationEnv(
+            data_strategies,
+            start_datetime=datetime.fromisoformat(cfg.env.start),
+            end_datetime=datetime.fromisoformat(cfg.env.end) - timedelta(days=90 * 2),
+            scheduling_time=time.fromisoformat(cfg.env.scheduling_time),
+            action_replacement_time=time.fromisoformat(cfg.env.action_time),
+            prosumer_init_balance=Currency(cfg.env.init_balance),
+            battery_capacity=MWh(cfg.env.bat_cap),
+            battery_init_charge=MWh(cfg.env.bat_init_charge),
+            battery_efficiency=cfg.env.bat_efficiency,
+        )
+        iw_env = IntervalWrapper(
+            env,
+            interval=timedelta(days=cfg.run.interval),
+            # split_ratio=split_ratio,
+            split_ratio=1.0,
+            randomly_set_battery=True,
+        )
+        aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+        fow_env = FilterObsWrapper(aw_env, -2)
+        return fow_env
 
     env = SimulationEnv(
         data_strategies,
@@ -108,11 +132,18 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     # res_env = pto_env
     # res_eval_env = eval_pto
     # res_test_env = test_pto
-    res_env = fow_env
+
+    # res_env = fow_env
+    res_env = VecMonitor(DummyVecEnv(
+        [lambda: create_train_env()] * cfg.run.train_envs,
+    ))
     res_eval_env = eval_fow_env
     res_test_env = test_fow_env
     if seed is not None:
-        res_env.reset(seed=seed)
+        if isinstance(res_env, VecMonitor):
+            res_env.seed(seed=seed)
+        else:
+            res_env.reset(seed=seed)
         res_eval_env.reset(seed=seed)
         res_test_env.reset(seed=seed)
     return res_env, res_eval_env, res_test_env

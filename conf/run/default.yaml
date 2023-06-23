@@ -1,4 +1,5 @@
 train_steps: 1_000
+train_envs: 1
 eval_freq: 2_500
 interval: 90
 shaping_coef: 0
