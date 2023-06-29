@@ -28,6 +28,7 @@ from src.obs_wrapper import FilterObsWrapper
 from src.price_types_wrapper import PriceTypeObsWrapper
 from src.reward_shaping import RewardShapingEnv
 from src.utils import get_weather_df, get_prices_df, get_data_strategies
+from src.custom_policy import CustomActorCriticPolicy
 
 
 def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
@@ -161,6 +162,8 @@ def main(cfg: DictConfig) -> None:
 
     with open(Path(orig_cwd) / __file__, 'r') as f:
         logging.info(f.read())
+    with open(Path(orig_cwd) / 'src' / 'custom_policy.py', 'r') as f:
+        logging.info(f.read())
 
     logging.info(' '.join(sys.argv))
     logging.info(f'agent={agent_name}')
@@ -175,8 +178,11 @@ def main(cfg: DictConfig) -> None:
     if seed is None:
         seed = int(datetime.now().timestamp())
     env, eval_env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
-    model = agent_class('MlpPolicy', env,
-                        **cfg.agent, verbose=1, seed=seed)
+    # model = agent_class('MlpPolicy', env,
+    model = agent_class(
+        CustomActorCriticPolicy, env, verbose=1, seed=seed,
+        **cfg.agent,
+    )
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
                                  log_path='.', eval_freq=cfg.run.eval_freq,
                                  n_eval_episodes=2, deterministic=True,
@@ -189,12 +195,13 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'action space: {env.action_space.shape}')
     logging.info(f'observation space: {env.observation_space.shape}')
 
+    # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
     if not os.path.exists(model_path):
         custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
         model.set_logger(custom_logger)
         model.learn(total_timesteps=cfg.run.train_steps,
                     log_interval=max(1, 500 // cfg.agent.n_steps),
-                    callback=eval_callback)
+                    callback=eval_callback, reset_num_timesteps=False)
         model.save(model_file)
         print('Training finished.')
         if cfg.run.train_steps >= cfg.run.eval_freq:
