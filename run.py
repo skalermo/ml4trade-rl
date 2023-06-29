@@ -101,7 +101,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         interval=timedelta(days=cfg.run.interval),
         # split_ratio=split_ratio,
         split_ratio=1.0,
-        randomly_set_battery=True,
+        randomly_set_battery=False,
     )
 
     test_env = SimulationEnv(
@@ -121,7 +121,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         test_env,
         interval=timedelta(days=cfg.run.interval),
         split_ratio=1.0,
-        randomly_set_battery=True,
+        randomly_set_battery=False,
     )
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
     aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
