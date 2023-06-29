@@ -15,7 +15,7 @@ from ml4trade.misc import (
 )
 from omegaconf import DictConfig
 
-from src.obs_wrapper import WindWrapper, SolarWrapper
+from src.obs_wrapper import WindWrapper, SolarWrapper, PriceWrapper
 
 
 def get_weather_df() -> pd.DataFrame:
@@ -75,5 +75,6 @@ def get_data_strategies(cfg: DictConfig, weather_df: pd.DataFrame, prices_df: pd
         'production': weather_strat,
         'consumption': ConsumptionWrapper(HouseholdEnergyConsumptionDataStrategy(window_size=24,
                                                                                  household_number=cfg.env.households)),
-        'market': MarketWrapper(PricesPlDataStrategy(prices_df)),
+        # 'market': MarketWrapper(PricesPlDataStrategy(prices_df)),
+        'market': PriceWrapper(PricesPlDataStrategy(prices_df)),
     }
