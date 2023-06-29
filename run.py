@@ -26,6 +26,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from src.evaluation import evaluate_policy
 from src.obs_wrapper import FilterObsWrapper
 from src.price_types_wrapper import PriceTypeObsWrapper
+from src.reward_shaping import RewardShapingEnv
 from src.utils import get_weather_df, get_prices_df, get_data_strategies
 
 
@@ -58,6 +59,9 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         )
         aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
         fow_env = FilterObsWrapper(aw_env, -2)
+        if cfg.run.shaping_coef is not None:
+            rs_env = RewardShapingEnv(fow_env, shaping_coef=cfg.run.shaping_coef)
+            return rs_env
         return fow_env
 
     env = SimulationEnv(
