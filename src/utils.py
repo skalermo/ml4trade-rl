@@ -45,12 +45,6 @@ def get_prices_df() -> pd.DataFrame:
     prices_df.fillna(method='bfill', inplace=True)
     prices_df['index'] = pd.to_datetime(prices_df['index'])
 
-    # manually fill the df beginning with dummy rows to align it with weather data
-    help_df = pd.DataFrame(columns=prices_df.columns, index=None)
-    for h in range(0, 22 + 1):
-        help_df.loc[h] = np.array([datetime(2016, 1, 1, h), 0, 0, 0, 0, 0, 0])
-    prices_df = pd.concat([help_df, prices_df], axis=0).reset_index()
-
     return prices_df
 
 
