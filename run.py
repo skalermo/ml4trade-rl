@@ -15,8 +15,6 @@ from ml4trade.misc.norm_ds_wrapper import DummyWrapper
 from ml4trade.simulation_env import SimulationEnv
 from omegaconf import DictConfig, OmegaConf
 
-import gymnasium
-sys.modules["gym"] = gymnasium
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common import logger
 from stable_baselines3.common.callbacks import EvalCallback

@@ -1,9 +1,8 @@
 from datetime import timedelta, datetime
 from typing import Union, Tuple
 
-import gym
 import pandas as pd
-from gym import ObservationWrapper
+from gymnasium import spaces, ObservationWrapper
 import numpy as np
 from ml4trade.simulation_env import SimulationEnv
 
@@ -21,7 +20,7 @@ class PriceTypeObsWrapper(ObservationWrapper):
                  use_future: bool = False):
         super().__init__(env)
         old_obs_len = self.observation_space.shape[0]
-        self.observation_space = gym.spaces.Box(
+        self.observation_space = spaces.Box(
             low=np.array([-np.inf] * old_obs_len + [0] * 6),
             high=np.array([np.inf] * old_obs_len + [1] * 6),
         )

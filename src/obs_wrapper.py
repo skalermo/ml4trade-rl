@@ -1,8 +1,7 @@
 from datetime import datetime
 from typing import List
 
-import gym
-from gym import ObservationWrapper
+from gymnasium import spaces, ObservationWrapper
 import numpy as np
 from ml4trade.data_strategies import ImgwSolarDataStrategy, ImgwWindDataStrategy, PricesPlDataStrategy
 from ml4trade.misc.norm_ds_wrapper import DataStrategyWrapper
@@ -21,7 +20,7 @@ class DateObsWrapper(ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         old_obs_len = self.observation_space.shape[0]
-        self.observation_space = gym.spaces.Box(
+        self.observation_space = spaces.Box(
             low=np.array([-np.inf] * old_obs_len + [0] * 19),
             high=np.array([np.inf] * old_obs_len + [1] * 19),
         )
@@ -39,7 +38,7 @@ class FilterObsWrapper(ObservationWrapper):
     def __init__(self, env, filter_out_idx: int):
         super().__init__(env)
         old_obs_len = self.observation_space.shape[0]
-        self.observation_space = gym.spaces.Box(
+        self.observation_space = spaces.Box(
             low=np.array([-np.inf] * (old_obs_len - 1)),
             high=np.array([np.inf] * (old_obs_len - 1)),
         )

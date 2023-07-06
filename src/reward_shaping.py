@@ -1,7 +1,7 @@
 from typing import Union
 
 import numpy as np
-from gym.core import RewardWrapper, Wrapper
+from gymnasium.core import RewardWrapper, Wrapper
 from ml4trade.simulation_env import SimulationEnv
 
 

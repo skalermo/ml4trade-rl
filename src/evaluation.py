@@ -3,7 +3,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import quantstats as qs
-from gym import Wrapper
+from gymnasium import Wrapper
 from ml4trade.simulation_env import SimulationEnv
 
 
