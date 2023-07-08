@@ -5,6 +5,7 @@ from datetime import datetime, time, timedelta
 from pathlib import Path
 
 import hydra
+import numpy as np
 from ml4trade.domain.units import *
 from ml4trade.misc import (
     IntervalWrapper,
@@ -15,10 +16,11 @@ from ml4trade.misc.norm_ds_wrapper import DummyWrapper
 from ml4trade.simulation_env import SimulationEnv
 from omegaconf import DictConfig, OmegaConf
 
-from stable_baselines3 import A2C, PPO
+from stable_baselines3 import A2C, PPO, DDPG
 from stable_baselines3.common import logger
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 
 from src.evaluation import evaluate_policy
@@ -156,7 +158,12 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
 def main(cfg: DictConfig) -> None:
     orig_cwd = hydra.utils.get_original_cwd()
 
-    agent_name = 'a2c' if cfg.agent.get('use_rms_prop') is not None else 'ppo'
+    if cfg.agent.get('buffer_size') is not None:
+        agent_name = 'ddpg'
+    elif cfg.agent.get('use_rms_prop') is not None:
+        agent_name = 'a2c'
+    else:
+        agent_name = 'ppo'
 
     with open(Path(orig_cwd) / __file__, 'r') as f:
         logging.info(f.read())
@@ -170,17 +177,30 @@ def main(cfg: DictConfig) -> None:
     agent_class = {
         'ppo': PPO,
         'a2c': A2C,
+        'ddpg': DDPG,
     }[agent_name]
 
     seed = cfg.run.get('seed')
     if seed is None:
         seed = int(datetime.now().timestamp())
     env, eval_env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
-    # model = agent_class('MlpPolicy', env,
-    model = agent_class(
-        CustomActorCriticPolicy, env, verbose=1, seed=seed,
-        **cfg.agent,
-    )
+
+    if agent_name == 'ddpg':
+        n_actions = env.action_space.shape[-1]
+        action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+        policy_kwargs = dict(net_arch=[400, 300])
+        model = agent_class(
+            'MlpPolicy', env,
+            verbose=1, seed=seed, action_noise=action_noise, policy_kwargs=policy_kwargs,
+            **cfg.agent,
+        )
+    else:
+        model = agent_class(
+            'MlpPolicy', env,
+            verbose=1, seed=seed,
+            **cfg.agent,
+        )
+
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
                                  log_path='.', eval_freq=cfg.run.eval_freq,
                                  n_eval_episodes=2, deterministic=True,
@@ -198,7 +218,7 @@ def main(cfg: DictConfig) -> None:
         custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
         model.set_logger(custom_logger)
         model.learn(total_timesteps=cfg.run.train_steps,
-                    log_interval=max(1, 500 // cfg.agent.n_steps),
+                    log_interval=max(1, 500 // cfg.agent.get('n_steps', 500)),
                     callback=eval_callback, reset_num_timesteps=False)
         model.save(model_file)
         print('Training finished.')

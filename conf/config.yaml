@@ -2,8 +2,8 @@ defaults:
   - agent: ppo
   - env: default
   - run: default
+  - action_noise: default
   - _self_
-  - override hydra/launcher: joblib
 
 tag: ''
 
