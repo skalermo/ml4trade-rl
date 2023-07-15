@@ -1,17 +1,8 @@
 from typing import Union
 
 import numpy as np
-import pandas as pd
-import quantstats as qs
 from gymnasium import Wrapper
 from ml4trade.simulation_env import SimulationEnv
-
-
-def quantstats_summary(env_history, agent_name: str):
-    qs.extend_pandas()
-    net_worth = pd.Series(env_history['wallet_balance'], index=env_history['datetime'])
-    returns = net_worth.pct_change().iloc[1:]
-    qs.reports.html(returns, output=f'{agent_name}_quantstats.html', download_filename=f'{agent_name}_quantstats.html')
 
 
 def evaluate_policy(model, env: Union[SimulationEnv, Wrapper], n_eval_episodes: int = 5):
