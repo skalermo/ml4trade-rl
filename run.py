@@ -18,11 +18,12 @@ from omegaconf import DictConfig, OmegaConf
 
 from stable_baselines3 import A2C, PPO, DDPG
 from stable_baselines3.common import logger
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 
+from src.callbacks import ResampleCallback
 from src.evaluation import evaluate_policy
 from src.obs_wrapper import FilterObsWrapper
 from src.price_types_wrapper import PriceTypeObsWrapper
@@ -196,7 +197,8 @@ def main(cfg: DictConfig) -> None:
         )
     else:
         model = agent_class(
-            'MlpPolicy', env,
+            # 'MlpPolicy', env,
+            CustomActorCriticPolicy, env,
             verbose=1, seed=seed,
             **cfg.agent,
         )
@@ -213,13 +215,16 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'action space: {env.action_space.shape}')
     logging.info(f'observation space: {env.observation_space.shape}')
 
+    cbs = CallbackList([eval_callback, ResampleCallback()])
+
     # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
     if not os.path.exists(model_path):
         custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
         model.set_logger(custom_logger)
         model.learn(total_timesteps=cfg.run.train_steps,
                     log_interval=max(1, 500 // cfg.agent.get('n_steps', 500)),
-                    callback=eval_callback, reset_num_timesteps=False)
+                    # callback=eval_callback, reset_num_timesteps=False)
+                    callback=cbs, reset_num_timesteps=False)
         model.save(model_file)
         print('Training finished.')
         if cfg.run.train_steps >= cfg.run.eval_freq:

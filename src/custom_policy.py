@@ -2,9 +2,11 @@ from typing import Callable, Tuple
 
 from gymnasium import spaces
 import torch as th
+from stable_baselines3.common.type_aliases import Schedule
 from torch import nn
-
 from stable_baselines3.common.policies import ActorCriticPolicy
+
+from src.noisy_layers import NoisyLinear
 
 
 class CustomNetwork(nn.Module):
@@ -20,33 +22,30 @@ class CustomNetwork(nn.Module):
     def __init__(
         self,
         feature_dim: int,
-        last_layer_dim_pi: int = 128,
-        last_layer_dim_vf: int = 128,
+        use_noise: bool = False,
+        last_layer_dim_pi: int = 64,
+        last_layer_dim_vf: int = 64,
     ):
         super().__init__()
-
-        #       pi -> 128 -> 128 -> 96
-        # 75 ->
-        #       vf -> 128 -> 128 -> 1
 
         self.latent_dim_pi = last_layer_dim_pi
         self.latent_dim_vf = last_layer_dim_vf
 
         # Policy network
         self.policy_net = nn.Sequential(
-            nn.Linear(feature_dim, 128),
+            nn.Linear(feature_dim, 64),
             nn.ReLU(),
-            nn.Linear(128, last_layer_dim_pi),
+            NoisyLinear(64, last_layer_dim_pi) if use_noise
+            else nn.Linear(64, last_layer_dim_pi),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
         )
         # Value network
         self.value_net = nn.Sequential(
-            nn.Linear(feature_dim, 128),
+            nn.Linear(feature_dim, 64),
             nn.ReLU(),
-            nn.Linear(128, last_layer_dim_vf),
+            NoisyLinear(64, last_layer_dim_vf) if use_noise
+            else nn.Linear(64, last_layer_dim_vf),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
         )
 
     def forward(self, features: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
@@ -74,6 +73,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
     ):
         # Disable orthogonal initialization
         kwargs["ortho_init"] = False
+        self.use_noise = kwargs.pop('use_noise', False)
         super().__init__(
             observation_space,
             action_space,
@@ -84,4 +84,15 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         )
 
     def _build_mlp_extractor(self) -> None:
-        self.mlp_extractor = CustomNetwork(self.features_dim)
+        self.mlp_extractor = CustomNetwork(self.features_dim, self.use_noise)
+
+    def _build(self, lr_schedule: Schedule) -> None:
+        super(CustomActorCriticPolicy, self)._build(lr_schedule)
+        if self.use_noise:
+            self.action_net = NoisyLinear(64, self.action_net.out_features)
+            self.value_net = NoisyLinear(64, self.value_net.out_features)
+
+    def resample(self):
+        for name, module in self.named_modules():
+            if isinstance(module, NoisyLinear):
+                module.resample()
