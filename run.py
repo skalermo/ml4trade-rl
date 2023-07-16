@@ -28,7 +28,7 @@ from src.evaluation import evaluate_policy
 from src.obs_wrapper import FilterObsWrapper
 from src.price_types_wrapper import PriceTypeObsWrapper
 from src.reward_shaping import RewardShapingEnv
-from src.utils import get_weather_df, get_prices_df, get_data_strategies
+from src.utils import get_weather_df, get_prices_df, get_data_strategies, linear_schedule
 from src.custom_policy import CustomActorCriticPolicy
 
 
@@ -201,6 +201,7 @@ def main(cfg: DictConfig) -> None:
             CustomActorCriticPolicy, env,
             verbose=1, seed=seed,
             **cfg.agent,
+            # **{**cfg.agent, **dict(learning_rate=linear_schedule(cfg.agent.learning_rate))},
         )
 
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
