@@ -222,10 +222,14 @@ def main(cfg: DictConfig) -> None:
     if not os.path.exists(model_path):
         custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
         model.set_logger(custom_logger)
-        model.learn(total_timesteps=cfg.run.train_steps,
-                    log_interval=max(1, 500 // cfg.agent.get('n_steps', 500)),
-                    # callback=eval_callback, reset_num_timesteps=False)
-                    callback=cbs, reset_num_timesteps=False)
+        try:
+            model.learn(total_timesteps=cfg.run.train_steps,
+                        log_interval=max(1, 500 // cfg.agent.get('n_steps', 500)),
+                        # callback=eval_callback, reset_num_timesteps=False)
+                        callback=cbs, reset_num_timesteps=False)
+        except Exception as e:
+            logging.info(e)
+            exit()
         model.save(model_file)
         print('Training finished.')
         if cfg.run.train_steps >= cfg.run.eval_freq:
