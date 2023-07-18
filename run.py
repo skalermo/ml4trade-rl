@@ -17,7 +17,7 @@ from ml4trade.misc.norm_ds_wrapper import DummyWrapper
 from ml4trade.simulation_env import SimulationEnv
 from omegaconf import DictConfig, OmegaConf
 
-from stable_baselines3 import A2C, PPO, DDPG
+from stable_baselines3 import A2C, PPO
 from stable_baselines3.common import logger
 from stable_baselines3.common.callbacks import EvalCallback, CallbackList
 from stable_baselines3.common.monitor import Monitor
@@ -180,7 +180,6 @@ def main(cfg: DictConfig) -> None:
     agent_class = {
         'ppo': PPO,
         'a2c': A2C,
-        'ddpg': DDPG,
     }[agent_name]
 
     seed = cfg.run.get('seed')
@@ -188,23 +187,14 @@ def main(cfg: DictConfig) -> None:
         seed = int(datetime.now().timestamp())
     env, eval_env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
 
-    if agent_name == 'ddpg':
-        n_actions = env.action_space.shape[-1]
-        action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
-        policy_kwargs = dict(net_arch=[400, 300])
-        model = agent_class(
-            'MlpPolicy', env,
-            verbose=1, seed=seed, action_noise=action_noise, policy_kwargs=policy_kwargs,
-            **cfg.agent,
-        )
-    else:
-        model = agent_class(
-            # 'MlpPolicy', env,
-            CustomActorCriticPolicy, env,
-            verbose=1, seed=seed,
-            **cfg.agent,
-            # **{**cfg.agent, **dict(learning_rate=linear_schedule(cfg.agent.learning_rate))},
-        )
+    model = agent_class(
+        # 'MlpPolicy', env,
+        CustomActorCriticPolicy, env,
+        verbose=1, seed=seed,
+        **cfg.agent,
+        # policy_kwargs=dict(use_noise=True),
+        # **{**cfg.agent, **dict(learning_rate=linear_schedule(cfg.agent.learning_rate))},
+    )
 
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
                                  log_path='.', eval_freq=cfg.run.eval_freq,
@@ -250,7 +240,6 @@ def main(cfg: DictConfig) -> None:
     else:
         print(f'Model {model_path} already exists. Skipping training...')
         model = agent_class.load(model_path, env)
-    # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
 
     # test_env.set_interval(timedelta(days=90))
     mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=3)
