@@ -3,6 +3,7 @@ defaults:
   - env: default
   - run: default
   - action_noise: default
+  - pretrain: default
   - _self_
 
 tag: ''

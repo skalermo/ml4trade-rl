@@ -6,6 +6,7 @@ from pathlib import Path
 
 import hydra
 import numpy as np
+import torch
 from ml4trade.domain.units import *
 from ml4trade.misc import (
     IntervalWrapper,
@@ -23,6 +24,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 
+from src import es
 from src.callbacks import ResampleCallback
 from src.evaluation import evaluate_policy
 from src.obs_wrapper import FilterObsWrapper
@@ -219,6 +221,16 @@ def main(cfg: DictConfig) -> None:
     cbs = CallbackList([eval_callback, ResampleCallback()])
 
     # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
+
+    if cfg.run.pretrain:
+        es.pretrain(
+            cfg, seed,
+            **cfg.pretrain,
+        )
+        model.policy = es.Ml4tradeIndividual.from_params(
+            torch.load(f'nes_{cfg.pretrain.pop_size}_{cfg.pretrain.iterations}.zip')
+        ).policy
+
     if not os.path.exists(model_path):
         custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
         model.set_logger(custom_logger)

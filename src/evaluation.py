@@ -5,7 +5,7 @@ from gymnasium import Wrapper
 from ml4trade.simulation_env import SimulationEnv
 
 
-def evaluate_policy(model, env: Union[SimulationEnv, Wrapper], n_eval_episodes: int = 5):
+def evaluate_policy(model, env: Union[SimulationEnv, Wrapper], n_eval_episodes: int = 5, silent: bool = False):
     episode_rewards = []
     episode_profits = []
     for i in range(n_eval_episodes):
@@ -19,7 +19,8 @@ def evaluate_policy(model, env: Union[SimulationEnv, Wrapper], n_eval_episodes: 
             ep_reward += reward
         episode_rewards.append(ep_reward)
         episode_profits.append(env.history[env.history._cur_tick_to_idx() - 1]['wallet_balance'])
-        print(episode_profits[-1])
+        if not silent:
+            print(episode_profits[-1])
     mean_reward = np.mean(episode_rewards)
     std_reward = np.std(episode_rewards)
     mean_profit = np.mean(episode_profits)
