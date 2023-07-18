@@ -78,7 +78,6 @@ def pretrain(
 
     optim = torch.optim.Adam(population.parameters(), lr=lr)
     pbar = tqdm.tqdm(range(1, iterations + 1))
-    pool = torch.multiprocessing.Pool()
 
     model = PPO(
         CustomActorCriticPolicy, env,
@@ -91,7 +90,8 @@ def pretrain(
 
     for i in pbar:
         optim.zero_grad()
-        raw_fit = population.fitness_grads(pop_size, pool, compute_centered_ranks)
+        with torch.multiprocessing.Pool() as pool:
+            raw_fit = population.fitness_grads(pop_size, pool, compute_centered_ranks)
         optim.step()
 
         if i % eval_freq == 0:
