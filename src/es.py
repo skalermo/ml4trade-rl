@@ -1,6 +1,7 @@
 from typing import Dict
 
 import torch
+torch.multiprocessing.set_sharing_strategy('file_system')
 from evostrat import Individual
 from evostrat import NormalPopulation, compute_centered_ranks
 import gymnasium
