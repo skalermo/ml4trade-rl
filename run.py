@@ -41,6 +41,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     data_strategies = get_data_strategies(cfg, weather_df, prices_df)
     data_strategies = {k: DummyWrapper(v) for k, v in data_strategies.items()}
     avg_month_price_retriever = AvgMonthPriceRetriever(prices_df)
+    max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
 
     def create_train_env():
         env = SimulationEnv(
@@ -127,7 +128,6 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         split_ratio=1.0,
         randomly_set_battery=False,
     )
-    max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
     aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
     test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
@@ -211,14 +211,13 @@ def main(cfg: DictConfig) -> None:
     cbs = CallbackList([eval_callback, ResampleCallback()])
 
     # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
-
     if cfg.run.pretrain:
         es.pretrain(
-            cfg, seed,
+            cfg, (env, eval_env, test_env), seed,
             **cfg.pretrain,
         )
         model.policy = es.Ml4tradeIndividual.from_params(
-            torch.load(f'nes_{cfg.pretrain.pop_size}_{cfg.pretrain.iterations}.zip')
+            torch.load(f'es_{cfg.pretrain.pop_size}_{cfg.pretrain.iterations}.zip')
         ).policy
 
     if not os.path.exists(model_path):
@@ -227,8 +226,8 @@ def main(cfg: DictConfig) -> None:
         try:
             model.learn(total_timesteps=cfg.run.train_steps,
                         log_interval=max(1, 500 // cfg.agent.get('n_steps', 500)),
-                        # callback=eval_callback, reset_num_timesteps=False)
-                        callback=cbs, reset_num_timesteps=False)
+                        callback=eval_callback, reset_num_timesteps=False)
+                        # callback=cbs, reset_num_timesteps=False)
         except Exception as e:
             logging.info(e)
             exit()

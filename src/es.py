@@ -64,6 +64,7 @@ class Ml4tradeIndividual(Individual):
 
 def pretrain(
         cfg,
+        envs,
         seed,
         std: float = 0.1,
         lr: float = 0.01,
@@ -71,7 +72,7 @@ def pretrain(
         pop_size: int = 16,
         eval_freq: int = 10,
 ):
-    env, eval_env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
+    env, eval_env, test_env = envs
     Ml4tradeIndividual.env = env.envs[0]
 
     param_shapes = {k: v.shape for k, v in Ml4tradeIndividual().get_params().items()}
