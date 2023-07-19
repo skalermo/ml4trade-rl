@@ -9,7 +9,11 @@ from stable_baselines3.common.policies import ActorCriticPolicy
 from src.noisy_layers import NoisyLinear
 
 
+HIDDEN_SIZE = 64
+
+
 class CustomNetwork(nn.Module):
+
     """
     Custom network for policy and value function.
     It receives as input the features extracted by the features extractor.
@@ -22,9 +26,8 @@ class CustomNetwork(nn.Module):
     def __init__(
         self,
         feature_dim: int,
-        use_noise: bool = False,
-        last_layer_dim_pi: int = 64,
-        last_layer_dim_vf: int = 64,
+        last_layer_dim_pi: int = HIDDEN_SIZE,
+        last_layer_dim_vf: int = HIDDEN_SIZE,
     ):
         super().__init__()
 
@@ -33,18 +36,16 @@ class CustomNetwork(nn.Module):
 
         # Policy network
         self.policy_net = nn.Sequential(
-            nn.Linear(feature_dim, 64),
+            nn.Linear(feature_dim, HIDDEN_SIZE),
             nn.ReLU(),
-            NoisyLinear(64, last_layer_dim_pi) if use_noise
-            else nn.Linear(64, last_layer_dim_pi),
+            nn.Linear(HIDDEN_SIZE, last_layer_dim_pi),
             nn.ReLU(),
         )
         # Value network
         self.value_net = nn.Sequential(
-            nn.Linear(feature_dim, 64),
+            nn.Linear(feature_dim, HIDDEN_SIZE),
             nn.ReLU(),
-            NoisyLinear(64, last_layer_dim_vf) if use_noise
-            else nn.Linear(64, last_layer_dim_vf),
+            nn.Linear(HIDDEN_SIZE, last_layer_dim_vf),
             nn.ReLU(),
         )
 
@@ -84,15 +85,15 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         )
 
     def _build_mlp_extractor(self) -> None:
-        self.mlp_extractor = CustomNetwork(self.features_dim, self.use_noise)
+        self.mlp_extractor = CustomNetwork(self.features_dim)
 
     def _build(self, lr_schedule: Schedule) -> None:
         super(CustomActorCriticPolicy, self)._build(lr_schedule)
         if self.use_noise:
-            self.action_net = NoisyLinear(64, self.action_net.out_features)
-            self.value_net = NoisyLinear(64, self.value_net.out_features)
+            self.action_net = NoisyLinear(self.action_net.in_features, self.action_net.out_features)
+            self.value_net = NoisyLinear(self.value_net.in_features, self.value_net.out_features)
 
     def resample(self):
-        for name, module in self.named_modules():
+        for module in (self.action_net, self.value_net):
             if isinstance(module, NoisyLinear):
                 module.resample()
