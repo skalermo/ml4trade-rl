@@ -8,7 +8,6 @@ import gymnasium
 import tqdm
 from stable_baselines3 import PPO
 
-from run import setup_sim_env
 from src.custom_policy import CustomActorCriticPolicy
 
 from src.evaluation import evaluate_policy
