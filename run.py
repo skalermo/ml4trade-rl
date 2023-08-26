@@ -204,7 +204,7 @@ def main(cfg: DictConfig) -> None:
 
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
                                  log_path='.', eval_freq=cfg.run.eval_freq,
-                                 n_eval_episodes=2, deterministic=True,
+                                 n_eval_episodes=3, deterministic=True,
                                  render=False)
 
     model_file = f'{agent_name}_{cfg.run.train_steps}.zip'
