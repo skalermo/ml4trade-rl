@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import sys
 from datetime import datetime, time, timedelta
 from pathlib import Path
@@ -185,6 +186,11 @@ def main(cfg: DictConfig) -> None:
     seed = cfg.run.get('seed')
     if seed is None:
         seed = int(datetime.now().timestamp())
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+
     env, eval_env, test_env = setup_sim_env(cfg, split_ratio=0.8, seed=seed)
 
     model = agent_class(
