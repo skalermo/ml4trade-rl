@@ -1,8 +1,8 @@
 # ppo parameters
 learning_rate: 3e-4
 #n_steps: 2048
-n_steps: 128
-batch_size: 128
+n_steps: 8
+batch_size: 32
 #gamma: 0.99
 gamma: 0.9
 gae_lambda: 0.95
