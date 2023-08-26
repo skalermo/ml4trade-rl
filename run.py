@@ -40,7 +40,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     prices_df = get_prices_df()
 
     data_strategies = get_data_strategies(cfg, weather_df, prices_df)
-    data_strategies = {k: DummyWrapper(v) for k, v in data_strategies.items()}
+    data_strategies = {k: DummyWrapper(v) if k not in ('production', 'market') else v for k, v in data_strategies.items()}
     avg_month_price_retriever = AvgMonthPriceRetriever(prices_df)
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
 

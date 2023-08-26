@@ -77,19 +77,20 @@ class SolarWrapper(DataStrategyWrapper):
 class PriceWrapper(DataStrategyWrapper):
     def __init__(self, ds: PricesPlDataStrategy):
         super().__init__(ds)
-        self.max_price = 10_000
 
     def observation_size(self) -> int:
-        return 25
+        return 24
 
     def observation(self, idx: int, _datetime: datetime = None) -> List[float]:
         obs = self.ds.observation(idx)
-        # return self._minmax_scale(obs)
         # return self._minmax_scale_wrt(obs, self.max_price)
         # return self._log_scale(obs, price)
-        obs = self.normalize(obs)
-        ma = int(np.argmax(obs)) / 24
-        return obs + [ma]
+        obs = self._minmax_scale(obs)
+        # obs = self.normalize(obs)
+        # mi = int(np.argmin(obs)) / 24
+        # ma = int(np.argmax(obs)) / 24
+        # return obs + [mi, ma]
+        return obs
 
     def _minmax_scale_wrt(self, obs: list, target: float):
         return list(map(lambda x: x / target, obs))
