@@ -20,6 +20,7 @@ class TestRuns(unittest.TestCase):
             'agent.n_steps=2',
             'run.render_all=False',
             'run.train_steps=10',
+            'run.train_envs=1',
             'run.eval_freq=10',
             f'+run.seed={seed}',
             'tag=_reproducibility-test',
