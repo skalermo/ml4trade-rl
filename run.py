@@ -55,6 +55,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
             battery_capacity=MWh(cfg.env.bat_cap),
             battery_init_charge=MWh(cfg.env.bat_init_charge),
             battery_efficiency=cfg.env.bat_efficiency,
+            use_reward_penalties=False,
         )
         iw_env = IntervalWrapper(
             env,
@@ -81,6 +82,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         battery_capacity=MWh(cfg.env.bat_cap),
         battery_init_charge=MWh(cfg.env.bat_init_charge),
         battery_efficiency=cfg.env.bat_efficiency,
+        use_reward_penalties=False,
     )
     iw_env = IntervalWrapper(
         env,
@@ -101,6 +103,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         battery_init_charge=MWh(cfg.env.bat_init_charge),
         battery_efficiency=cfg.env.bat_efficiency,
         start_tick=iw_env.test_data_start_tick,
+        use_reward_penalties=False,
     )
     eval_iw_env = IntervalWrapper(
         eval_env,
@@ -122,6 +125,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         battery_init_charge=MWh(cfg.env.bat_init_charge),
         battery_efficiency=cfg.env.bat_efficiency,
         start_tick=eval_iw_env.test_data_start_tick,
+        use_reward_penalties=False,
     )
     test_iw_env = IntervalWrapper(
         test_env,
