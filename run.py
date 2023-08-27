@@ -32,7 +32,7 @@ from src.obs_wrapper import FilterObsWrapper
 from src.price_types_wrapper import PriceTypeObsWrapper
 from src.reward_shaping import RewardShapingEnv
 from src.utils import get_weather_df, get_prices_df, get_data_strategies, linear_schedule
-from src.custom_policy import CustomActorCriticPolicy
+from src.custom_policy import CustomActorCriticPolicy, CustomMultiHeadPolicy
 
 
 def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
@@ -196,6 +196,7 @@ def main(cfg: DictConfig) -> None:
     model = agent_class(
         # 'MlpPolicy', env,
         CustomActorCriticPolicy, env,
+        # CustomMultiHeadPolicy, env,
         verbose=1, seed=seed,
         **cfg.agent,
         # policy_kwargs=dict(use_noise=True),
