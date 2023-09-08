@@ -12,7 +12,7 @@ from ml4trade.domain.units import *
 from ml4trade.misc import (
     IntervalWrapper,
     ActionWrapper,
-    AvgMonthPriceRetriever,
+    AvgIntervalPriceRetriever,
 )
 from ml4trade.misc.norm_ds_wrapper import DummyWrapper
 from ml4trade.simulation_env import SimulationEnv
@@ -41,7 +41,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
 
     data_strategies = get_data_strategies(cfg, weather_df, prices_df)
     data_strategies = {k: DummyWrapper(v) if k not in ('production', 'market') else v for k, v in data_strategies.items()}
-    avg_month_price_retriever = AvgMonthPriceRetriever(prices_df)
+    avg_interval_price_retriever = AvgIntervalPriceRetriever(prices_df, interval_days=90)
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
 
     def create_train_env():
@@ -64,7 +64,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
             split_ratio=1.0,
             randomly_set_battery=True,
         )
-        aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+        aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_interval_price_retriever=avg_interval_price_retriever)
         fow_env = FilterObsWrapper(aw_env, -2)
         if cfg.run.shaping_coef is not None:
             rs_env = RewardShapingEnv(fow_env, shaping_coef=cfg.run.shaping_coef)
@@ -133,9 +133,9 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         split_ratio=1.0,
         randomly_set_battery=False,
     )
-    aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
-    test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2, avg_month_price_retriever=avg_month_price_retriever)
+    aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_interval_price_retriever=avg_interval_price_retriever)
+    eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=max_power / 2, avg_interval_price_retriever=avg_interval_price_retriever)
+    test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2, avg_interval_price_retriever=avg_interval_price_retriever)
     fow_env = FilterObsWrapper(aw_env, -2)
     eval_fow_env = FilterObsWrapper(eval_aw_env, -2)
     test_fow_env = FilterObsWrapper(test_aw_env, -2)
