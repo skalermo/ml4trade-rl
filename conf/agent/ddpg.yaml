@@ -1,5 +1,0 @@
-# ddpg parameters
-learning_rate: 1e-3
-buffer_size: 200_000
-learning_starts: 10_000
-gamma: 0.9
