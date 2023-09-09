@@ -2,6 +2,7 @@ train_steps: 1_000_000
 train_envs: 8
 eval_freq: 2_500
 interval: 90
+aw_interval: 30
 shaping_coef: 0
 render_all: True
 grouping_period: 7
