@@ -107,7 +107,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     )
     eval_iw_env = IntervalWrapper(
         eval_env,
-        interval=timedelta(days=cfg.run.interval),
+        interval=timedelta(days=90),
         # split_ratio=split_ratio,
         split_ratio=1.0,
         randomly_set_battery=False,
@@ -129,7 +129,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     )
     test_iw_env = IntervalWrapper(
         test_env,
-        interval=timedelta(days=cfg.run.interval),
+        interval=timedelta(days=90),
         split_ratio=1.0,
         randomly_set_battery=False,
     )
