@@ -43,6 +43,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     data_strategies = {k: DummyWrapper(v) if k not in ('production', 'market') else v for k, v in data_strategies.items()}
     avg_interval_price_retriever = AvgIntervalPriceRetriever(prices_df, interval_days=cfg.run.aw_interval)
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
+    ref_power_MW = max_power * cfg.run.aw_ref_power_coef * 2
 
     def create_train_env():
         env = SimulationEnv(
@@ -64,7 +65,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
             split_ratio=1.0,
             randomly_set_battery=True,
         )
-        aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_interval_price_retriever=avg_interval_price_retriever)
+        aw_env = ActionWrapper(iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
         fow_env = FilterObsWrapper(aw_env, -2)
         if cfg.run.shaping_coef is not None:
             rs_env = RewardShapingEnv(fow_env, shaping_coef=cfg.run.shaping_coef)
@@ -133,9 +134,9 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         split_ratio=1.0,
         randomly_set_battery=False,
     )
-    aw_env = ActionWrapper(iw_env, ref_power_MW=max_power / 2, avg_interval_price_retriever=avg_interval_price_retriever)
-    eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=max_power / 2, avg_interval_price_retriever=avg_interval_price_retriever)
-    test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=max_power / 2, avg_interval_price_retriever=avg_interval_price_retriever)
+    aw_env = ActionWrapper(iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
+    eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
+    test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
     fow_env = FilterObsWrapper(aw_env, -2)
     eval_fow_env = FilterObsWrapper(eval_aw_env, -2)
     test_fow_env = FilterObsWrapper(test_aw_env, -2)

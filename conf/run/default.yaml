@@ -3,6 +3,7 @@ train_envs: 8
 eval_freq: 2_500
 train_ep_len: 90
 aw_interval: 30
+aw_ref_power_coef: 0.25
 shaping_coef: 0
 render_all: True
 grouping_period: 7
