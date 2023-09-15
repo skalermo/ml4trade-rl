@@ -32,7 +32,7 @@ from src.obs_wrapper import FilterObsWrapper
 from src.price_types_wrapper import PriceTypeObsWrapper
 from src.reward_shaping import RewardShapingEnv
 from src.utils import get_weather_df, get_prices_df, get_data_strategies, linear_schedule
-from src.custom_policy import CustomActorCriticPolicy, CustomMultiHeadPolicy
+from src.custom_policy import CustomActorCriticPolicy
 
 
 def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
