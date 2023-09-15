@@ -8,6 +8,7 @@ from pathlib import Path
 import hydra
 import numpy as np
 import torch
+from ml4trade.data_strategies import PricesPlDataStrategy
 from ml4trade.domain.units import *
 from ml4trade.misc import (
     IntervalWrapper,
@@ -28,7 +29,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from src import es
 from src.callbacks import ResampleCallback
 from src.evaluation import evaluate_policy
-from src.obs_wrapper import FilterObsWrapper
+from src.obs_wrapper import FilterObsWrapper, PriceWrapper
 from src.price_types_wrapper import PriceTypeObsWrapper
 from src.reward_shaping import RewardShapingEnv
 from src.utils import get_weather_df, get_prices_df, get_data_strategies, linear_schedule
@@ -67,6 +68,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         )
         aw_env = ActionWrapper(iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
         fow_env = FilterObsWrapper(aw_env, -2)
+        # fow_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), iw_env.test_data_start, use_future=cfg.run.future_market_obs)
         if cfg.run.shaping_coef is not None:
             rs_env = RewardShapingEnv(fow_env, shaping_coef=cfg.run.shaping_coef)
             return rs_env
@@ -140,14 +142,22 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     fow_env = FilterObsWrapper(aw_env, -2)
     eval_fow_env = FilterObsWrapper(eval_aw_env, -2)
     test_fow_env = FilterObsWrapper(test_aw_env, -2)
-    # pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
-    # eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
-    # test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), eval_aw_env.test_data_start)
+    # pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), iw_env.test_data_start, use_future=cfg.run.future_market_obs)
+    # eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), iw_env.test_data_start, use_future=False)
+    # test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), iw_env.test_data_start, use_future=False)
     # res_env = pto_env
     # res_eval_env = eval_pto
     # res_test_env = test_pto
 
     # res_env = fow_env
+
+    if cfg.run.future_market_obs:
+        future_market_ds = PriceWrapper(PricesPlDataStrategy(prices_df))
+
+        # offset obs window one day into future
+        future_market_ds.ds.scheduling_hour -= 24
+        data_strategies['market'] = future_market_ds
+
     res_env = VecMonitor(DummyVecEnv(
         [lambda: create_train_env()] * cfg.run.train_envs,
     ))

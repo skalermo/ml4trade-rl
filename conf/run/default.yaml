@@ -8,3 +8,4 @@ shaping_coef: 0
 render_all: True
 grouping_period: 7
 pretrain: False
+future_market_obs: False
