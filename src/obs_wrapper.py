@@ -1,9 +1,11 @@
 from datetime import datetime
 from typing import List
 
+import pandas as pd
 from gymnasium import spaces, ObservationWrapper
 import numpy as np
-from ml4trade.data_strategies import ImgwSolarDataStrategy, ImgwWindDataStrategy, PricesPlDataStrategy
+from ml4trade.data_strategies import ImgwSolarDataStrategy, ImgwWindDataStrategy, PricesPlDataStrategy, ImgwDataStrategy
+from ml4trade.domain.units import MW
 from ml4trade.misc.norm_ds_wrapper import DataStrategyWrapper
 from ml4trade.simulation_env import SimulationEnv
 
@@ -108,3 +110,22 @@ class PriceWrapper(DataStrategyWrapper):
         scaled = self._minmax_scale(obs)
         normalized = list(map(lambda x: x / sum(scaled), scaled))
         return normalized
+
+
+class WeatherStatsWrapper(ImgwDataStrategy):
+    def __init__(self, df: pd.DataFrame, window_size: int, max_solar_power: MW, solar_efficiency: float,
+                 max_wind_power: MW, max_wind_speed: float, ref_power_MW: float):
+        super().__init__(df, window_size, max_solar_power, solar_efficiency, max_wind_power, max_wind_speed)
+        self.ref_power_MW = ref_power_MW
+
+    def observation_size(self) -> int:
+        return 24
+
+    def observation(self, idx: int) -> List[float]:
+        start_idx = idx + 24 - self.scheduling_hour
+        end_idx = start_idx + 24
+        power_prediction = [
+            (self.imgwWindDataStrategy.process(idx) + self.imgwSolarDataStrategy.process(idx)) / self.ref_power_MW
+            for idx in range(start_idx, end_idx)
+        ]
+        return power_prediction

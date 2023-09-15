@@ -13,7 +13,7 @@ from ml4trade.misc import (
 )
 from omegaconf import DictConfig
 
-from src.obs_wrapper import WindWrapper, SolarWrapper, PriceWrapper
+from src.obs_wrapper import WindWrapper, SolarWrapper, PriceWrapper, WeatherStatsWrapper
 
 
 def get_weather_df() -> pd.DataFrame:
@@ -48,6 +48,7 @@ def get_prices_df() -> pd.DataFrame:
 
 def get_data_strategies(cfg: DictConfig, weather_df: pd.DataFrame, prices_df: pd.DataFrame) -> Dict:
     weather_strat = ImgwDataStrategy(weather_df, window_size=24, window_direction='forward',
+    # weather_strat = WeatherStatsWrapper(weather_df, window_size=24, ref_power_MW=cfg.env.bat_cap,
                                      max_solar_power=cfg.env.max_solar_power, solar_efficiency=cfg.env.solar_efficiency,
                                      max_wind_power=cfg.env.max_wind_power, max_wind_speed=cfg.env.max_wind_speed)
     weather_strat.imgwWindDataStrategy = WindWrapper(
