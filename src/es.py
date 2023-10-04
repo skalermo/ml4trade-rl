@@ -1,3 +1,5 @@
+import json
+import logging
 from typing import Dict
 
 import torch
@@ -98,17 +100,30 @@ def pretrain(
         if i % eval_freq == 0:
             ind = Ml4tradeIndividual.from_params(population.param_means)
             model.policy = ind.policy
-            mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, eval_env, n_eval_episodes=1,
+            mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, eval_env, n_eval_episodes=3,
                                                                                silent=True)
             if mean_reward > best_eval_reward:
                 best_eval_reward = mean_reward
                 best_params = population.param_means
 
-        pbar.set_description("fit avg: %0.3f, std: %0.3f" % (raw_fit.mean().item(), raw_fit.std().item()))
+                save_path = f'es_best.zip'
+                torch.save(best_params, save_path)
+
+            eval_progress = {'eval_iter': i, 'mean_reward': mean_reward, 'std_reward': std_reward, 'mean_profit': mean_profit, 'std_profit': std_profit}
+            with open('es_progress.json', 'a') as f:
+                f.write(json.dumps(eval_progress) + '\n')
+        desc = "iter: %i, fit avg: %0.3f, std: %0.3f" % (i, raw_fit.mean().item(), raw_fit.std().item())
+        pbar.set_description(desc)
+        progress = {'iter': i, 'fit_avg': raw_fit.mean().item(), 'std': raw_fit.std().item()}
+        with open('es_progress.json', 'a') as f:
+            f.write(json.dumps(progress) + '\n')
 
     best = Ml4tradeIndividual.from_params(best_params)
     model.policy = best.policy
     mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=1)
+    logging.info('ES results:')
+    logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
+    logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')
     test_env.save_history()
 
     if cfg.run.render_all:
