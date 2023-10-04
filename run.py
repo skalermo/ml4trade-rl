@@ -108,13 +108,6 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         start_tick=iw_env.test_data_start_tick,
         use_reward_penalties=False,
     )
-    eval_iw_env = IntervalWrapper(
-        eval_env,
-        interval=timedelta(days=90),
-        # split_ratio=split_ratio,
-        split_ratio=1.0,
-        randomly_set_battery=False,
-    )
 
     test_env = SimulationEnv(
         data_strategies,
@@ -127,18 +120,12 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
         battery_capacity=MWh(cfg.env.bat_cap),
         battery_init_charge=MWh(cfg.env.bat_init_charge),
         battery_efficiency=cfg.env.bat_efficiency,
-        start_tick=eval_iw_env.test_data_start_tick,
+        start_tick=iw_env.test_data_start_tick + 24 * 90,
         use_reward_penalties=False,
     )
-    test_iw_env = IntervalWrapper(
-        test_env,
-        interval=timedelta(days=90),
-        split_ratio=1.0,
-        randomly_set_battery=False,
-    )
     aw_env = ActionWrapper(iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
-    eval_aw_env = ActionWrapper(eval_iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
-    test_aw_env = ActionWrapper(test_iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
+    eval_aw_env = ActionWrapper(eval_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
+    test_aw_env = ActionWrapper(test_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
     fow_env = FilterObsWrapper(aw_env, -2)
     eval_fow_env = FilterObsWrapper(eval_aw_env, -2)
     test_fow_env = FilterObsWrapper(test_aw_env, -2)
