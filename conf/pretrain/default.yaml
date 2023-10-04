@@ -1,6 +1,0 @@
-# es params
-std: 0.1
-lr: 0.01
-iterations: 1000
-pop_size: 64
-eval_freq: 10

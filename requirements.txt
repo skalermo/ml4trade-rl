@@ -1,6 +1,5 @@
-git+ssh://git@github.com/skalermo/ml4trade.git
+git+https://git@github.com/skalermo/ml4trade.git
 pandas
 stable-baselines3>=2.0.0
-evostrat
 hydra-core
 tensorboard

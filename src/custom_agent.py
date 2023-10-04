@@ -40,7 +40,6 @@ class RuleBasedAgent:
         amounts_to_sell = [0] * 24
 
         energy_generated = [self._energy_generated_MWh(w, s) for w, s in zip(wind_forecast, solar_forecast)]
-        # energy_consumed = [self._energy_consumed_MWh(h, households_number=self.cfg.env.households) * 1.15 for h in range(0, 24)]
         energy_consumed = [self._energy_consumed_MWh(h, households_number=self.cfg.env.households) * 1.10 for h in range(0, 24)]
         energy_surplus = [g - c for g, c in zip(energy_generated, energy_consumed)]
 
@@ -57,12 +56,9 @@ class RuleBasedAgent:
 
         # refill battery
         amounts_to_buy[bottom_price_hour] += (self.cfg.env.bat_cap - bat_forecast) / 1.75 * 1.9
-        # amounts_to_buy[bottom_price_hour] += self.cfg.env.bat_cap * 0.5
 
         # sell 80% of battery energy
-        # amounts_to_sell[top_price_hour] += self.cfg.env.bat_cap * 0.75
         amounts_to_sell[top_price_hour] += self.cfg.env.bat_cap * 0.9
-        # amounts_to_sell[top_price_hour] += self.cfg.env.bat_cap * 0.5
 
         actions = amounts_to_buy + amounts_to_sell + [1_000_000] * 24 + [0] * 24
         return np.array(actions), None

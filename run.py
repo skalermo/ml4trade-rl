@@ -21,18 +21,14 @@ from omegaconf import DictConfig, OmegaConf
 
 from stable_baselines3 import A2C, PPO
 from stable_baselines3.common import logger
-from stable_baselines3.common.callbacks import EvalCallback, CallbackList
+from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 
-from src import es
-from src.callbacks import ResampleCallback
 from src.evaluation import evaluate_policy
 from src.obs_wrapper import FilterObsWrapper, PriceWrapper
-from src.price_types_wrapper import PriceTypeObsWrapper
 from src.reward_shaping import RewardShapingEnv
-from src.utils import get_weather_df, get_prices_df, get_data_strategies, linear_schedule
+from src.utils import get_weather_df, get_prices_df, get_data_strategies
 from src.custom_policy import CustomActorCriticPolicy
 
 
@@ -65,10 +61,10 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
             # split_ratio=split_ratio,
             split_ratio=1.0,
             randomly_set_battery=True,
+            randomly_shift_obs=True,
         )
         aw_env = ActionWrapper(iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
         fow_env = FilterObsWrapper(aw_env, -2)
-        # fow_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), iw_env.test_data_start, use_future=cfg.run.future_market_obs)
         if cfg.run.shaping_coef is not None:
             rs_env = RewardShapingEnv(fow_env, shaping_coef=cfg.run.shaping_coef)
             return rs_env
@@ -126,17 +122,9 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     aw_env = ActionWrapper(iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
     eval_aw_env = ActionWrapper(eval_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
     test_aw_env = ActionWrapper(test_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
-    fow_env = FilterObsWrapper(aw_env, -2)
+    # fow_env = FilterObsWrapper(aw_env, -2)
     eval_fow_env = FilterObsWrapper(eval_aw_env, -2)
     test_fow_env = FilterObsWrapper(test_aw_env, -2)
-    # pto_env = PriceTypeObsWrapper(fow_env, prices_df, timedelta(days=cfg.run.grouping_period), iw_env.test_data_start, use_future=cfg.run.future_market_obs)
-    # eval_pto = PriceTypeObsWrapper(eval_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), iw_env.test_data_start, use_future=False)
-    # test_pto = PriceTypeObsWrapper(test_fow_env, prices_df, timedelta(days=cfg.run.grouping_period), iw_env.test_data_start, use_future=False)
-    # res_env = pto_env
-    # res_eval_env = eval_pto
-    # res_test_env = test_pto
-
-    # res_env = fow_env
 
     if cfg.run.future_market_obs:
         future_market_ds = PriceWrapper(PricesPlDataStrategy(prices_df))
@@ -198,11 +186,8 @@ def main(cfg: DictConfig) -> None:
     model = agent_class(
         # 'MlpPolicy', env,
         CustomActorCriticPolicy, env,
-        # CustomMultiHeadPolicy, env,
         verbose=1, seed=seed,
         **cfg.agent,
-        # policy_kwargs=dict(use_noise=True),
-        # **{**cfg.agent, **dict(learning_rate=linear_schedule(cfg.agent.learning_rate))},
     )
 
     eval_callback = EvalCallback(Monitor(eval_env), best_model_save_path='.',
@@ -217,18 +202,6 @@ def main(cfg: DictConfig) -> None:
     logging.info(f'action space: {env.action_space.shape}')
     logging.info(f'observation space: {env.observation_space.shape}')
 
-    cbs = CallbackList([eval_callback, ResampleCallback()])
-
-    # model = agent_class.load(f'{orig_cwd}/best_model.zip', env)
-    if cfg.run.pretrain:
-        es.pretrain(
-            cfg, (env, eval_env, test_env), seed,
-            **cfg.pretrain,
-        )
-        model.policy = es.Ml4tradeIndividual.from_params(
-            torch.load(f'es_{cfg.pretrain.pop_size}_{cfg.pretrain.iterations}.zip')
-        ).policy
-
     if not os.path.exists(model_path):
         custom_logger = logger.configure('.', ['stdout', 'json', 'tensorboard'])
         model.set_logger(custom_logger)
@@ -236,7 +209,6 @@ def main(cfg: DictConfig) -> None:
             model.learn(total_timesteps=cfg.run.train_steps,
                         log_interval=max(1, 500 // cfg.agent.get('n_steps', 500)),
                         callback=eval_callback, reset_num_timesteps=False)
-                        # callback=cbs, reset_num_timesteps=False)
         except Exception as e:
             logging.info(e)
             exit()
@@ -249,7 +221,6 @@ def main(cfg: DictConfig) -> None:
         print(f'Model {model_path} already exists. Skipping training...')
         model = agent_class.load(model_path, env)
 
-    # test_env.set_interval(timedelta(days=90))
     mean_reward, std_reward, mean_profit, std_profit = evaluate_policy(model, test_env, n_eval_episodes=3)
     logging.info(f'Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}')
     logging.info(f'Mean profit: {mean_profit:.2f} +/- {std_profit:.2f}')

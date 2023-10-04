@@ -6,8 +6,6 @@ from stable_baselines3.common.type_aliases import Schedule
 from torch import nn
 from stable_baselines3.common.policies import ActorCriticPolicy
 
-from src.noisy_layers import NoisyLinear
-
 
 HIDDEN_SIZE = 64
 
@@ -74,7 +72,6 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
     ):
         # Disable orthogonal initialization
         kwargs["ortho_init"] = False
-        self.use_noise = kwargs.pop('use_noise', False)
         super().__init__(
             observation_space,
             action_space,
@@ -89,11 +86,3 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
 
     def _build(self, lr_schedule: Schedule) -> None:
         super(CustomActorCriticPolicy, self)._build(lr_schedule)
-        if self.use_noise:
-            self.action_net = NoisyLinear(self.action_net.in_features, self.action_net.out_features)
-            self.value_net = NoisyLinear(self.value_net.in_features, self.value_net.out_features)
-
-    def resample(self):
-        for module in (self.action_net, self.value_net):
-            if isinstance(module, NoisyLinear):
-                module.resample()
