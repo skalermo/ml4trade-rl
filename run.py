@@ -28,9 +28,11 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 
 from src import es
 from src.callbacks import ResampleCallback
+from src.custom_agent import RuleBasedAgent
 from src.evaluation import evaluate_policy
 from src.obs_wrapper import FilterObsWrapper, PriceWrapper
 from src.price_types_wrapper import PriceTypeObsWrapper
+from src.random_agent import RandomAgent
 from src.reward_shaping import RewardShapingEnv
 from src.utils import get_weather_df, get_prices_df, get_data_strategies, linear_schedule
 from src.custom_policy import CustomActorCriticPolicy
@@ -44,6 +46,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
     data_strategies = {k: DummyWrapper(v) if k not in ('production', 'market') else v for k, v in data_strategies.items()}
     avg_interval_price_retriever = AvgIntervalPriceRetriever(prices_df, interval_days=cfg.run.aw_interval)
     max_power = cfg.env.max_solar_power + cfg.env.max_wind_power
+    # max_power = cfg.env.bat_cap
     ref_power_MW = max_power * cfg.run.aw_ref_power_coef * 2
 
     def create_train_env():
@@ -65,6 +68,7 @@ def setup_sim_env(cfg: DictConfig, split_ratio: float = 0.8, seed: int = None):
             # split_ratio=split_ratio,
             split_ratio=1.0,
             randomly_set_battery=True,
+            randomly_shift_obs=True,
         )
         aw_env = ActionWrapper(iw_env, ref_power_MW=ref_power_MW, avg_interval_price_retriever=avg_interval_price_retriever)
         fow_env = FilterObsWrapper(aw_env, -2)
@@ -198,7 +202,6 @@ def main(cfg: DictConfig) -> None:
     model = agent_class(
         # 'MlpPolicy', env,
         CustomActorCriticPolicy, env,
-        # CustomMultiHeadPolicy, env,
         verbose=1, seed=seed,
         **cfg.agent,
         # policy_kwargs=dict(use_noise=True),

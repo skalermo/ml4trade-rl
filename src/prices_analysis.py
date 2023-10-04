@@ -10,7 +10,8 @@ from src.utils import get_prices_df
 
 def avg_price(df, name=''):
     cols = 'Fixing I Price [PLN/MWh]'
-
+    if 'level_0' in df.columns:
+        df = df.drop('level_0', axis=1)
     mean = df.groupby(df['index'].map(lambda t: t.hour)).mean()
     median = df.groupby(df['index'].map(lambda t: t.hour)).median()
 
@@ -26,20 +27,51 @@ def avg_price(df, name=''):
 
 def daily_prices_ratios():
     # df_new = df[:int(len(df) * 0.8)]
+    # df_new = df[24:]
     df_new = df
     max_to_min_ratios = df.groupby(
         [df_new['index'].dt.year.rename('year'), df_new['index'].dt.month.rename('month'),
          df_new['index'].dt.day.rename('day')]
     )['Fixing I Price [PLN/MWh]'].apply(lambda day_prices: max(day_prices) / min(day_prices)).reset_index()
+    # )['Fixing I Price [PLN/MWh]'].apply(lambda day_prices: np.average(day_prices)).reset_index()
     max_to_min_ratios.rename(columns={'Fixing I Price [PLN/MWh]': 'ratio'}, inplace=True)
     max_to_min_ratios['date'] = pd.to_datetime(max_to_min_ratios[['year', 'month', 'day']])
 
-    plt.plot(max_to_min_ratios['date'], max_to_min_ratios['ratio'], '.')
-    plt.axhline(y=2, color='blue', linestyle='--')
-    plt.axhline(y=10 / 8, color='green', linestyle='--')
-    plt.yticks([1.25, 2, 4, 10])
-    plt.axvline(x=max_to_min_ratios['date'][int(len(max_to_min_ratios) * 0.8)], color='grey', linestyle='--')
+
+    # f = plt.figure()
+    f, ax = plt.subplots()
+    # start = 0
+    # end = 4*365-1-2*90
+    # print(end - start)
+    # plt.plot(max_to_min_ratios['date'][start:end], max_to_min_ratios['ratio'][start:end], '.', color='green')
+    # start = end
+    # end = 4*365-1 - 90
+    # print(end - start)
+    # plt.plot(max_to_min_ratios['date'][start:end], max_to_min_ratios['ratio'][start:end], '.', color='yellow')
+    # start = end
+    # end = 4 * 365 - 1
+    # print(end - start)
+    # plt.plot(max_to_min_ratios['date'][start:end], max_to_min_ratios['ratio'][start:end], '.', color='red')
+    # start = end
+    # end = None
+    # print(len(max_to_min_ratios['date'][start:end]))
+    # plt.plot(max_to_min_ratios['date'][start:end], max_to_min_ratios['ratio'][start:end], '.', color='grey')
+    # plt.ylabel('Zł / MWh')
+    max_to_min_ratios = max_to_min_ratios[max_to_min_ratios['year'] < 2020]
+
+    # plt.plot(max_to_min_ratios['date'], max_to_min_ratios['ratio'], '.', color='red')
+    # plt.axhline(y=1 / 0.5, color='blue', linestyle='--')
+    # plt.axhline(y=1 / 0.85, color='green', linestyle='--')
+    # plt.yticks([1.17, 2, 4, 10])
+    # plt.axvline(x=max_to_min_ratios['date'][int(len(max_to_min_ratios) * 0.8)], color='grey', linestyle='--')
+
+    plt.hist(max_to_min_ratios['ratio'], bins=100)
+    plt.xticks([1.17, 2, 4, 10])
+    ax.set_xticklabels([0.85, 0.5, 0.25, 0.1])
+    # labels = [item.get_text() for item in ax.get_xticklabels()]
+    # plt.set_ticklabels([0.85, 0.5, 0.25, 0.1])
     plt.show()
+    # f.savefig("prices-data-split.pdf", bbox_inches='tight')
 
 
 def all_prices():
@@ -52,20 +84,20 @@ def all_prices():
     idx = np.where(df['index'] == cur_date)[0][0]
     idx2 = np.where(df['index'] == end_date)[0][0]
 
-    # while cur_date < end_date:
-    #     next_date = cur_date + timedelta(days=1)
-    #     print(cur_date, next_date)
-    #     idx = np.where(df['index'] == cur_date)[0][0]
-    #     idx2 = np.where(df['index'] == next_date)[0][0]
-    #     name = f'{str(cur_date)[:-9]}-{str(next_date)[:-9]}.png'
-    #     plt.title(name)
-    #     avg_price(df[idx:idx2], f'avg_prices/{name}')
-    #     cur_date = next_date
-    #     plt.cla()
-    #     plt.clf()
+    while cur_date < end_date:
+        next_date = cur_date + timedelta(days=1)
+        print(cur_date, next_date)
+        idx = np.where(df['index'] == cur_date)[0][0]
+        idx2 = np.where(df['index'] == next_date)[0][0]
+        name = f'{str(cur_date)[:-9]}-{str(next_date)[:-9]}'
+        plt.title(name)
+        avg_price(df[idx:idx2], f'avg_prices/{name}.png')
+        cur_date = next_date
+        plt.cla()
+        plt.clf()
     plt.axvline(x=df['index'][idx], color='grey', linestyle='--')
     plt.axvline(x=df['index'][idx2], color='grey', linestyle='--')
-    avg_price(df[idx2:idx])
+    # avg_price(df[idx2:idx])
 
     plt.show()
 
@@ -110,7 +142,7 @@ def daily_prices_diff_analysis(df: pd.DataFrame, test_start_datetime: datetime =
 def get_day_hilos(arr: pd.Series):
     arr = arr.to_numpy()
     night_low = np.argmin(arr[:10])
-    morning_high = np.argmax(arr[night_low:14]) + night_low
+    morning_high = np.argmax(arr[night_low:12]) + night_low
     day_low = np.argmin(arr[morning_high:18]) + morning_high
     evening_high = np.argmax(arr[day_low:]) + day_low
     return night_low, morning_high, day_low, evening_high, \
@@ -118,8 +150,7 @@ def get_day_hilos(arr: pd.Series):
         analyze_hilos(mh=arr[morning_high], dl=arr[day_low], eh=arr[evening_high])
 
 
-def analyze_hilos(mh, dl, eh):
-    margin = 0.1
+def analyze_hilos(mh, dl, eh, margin: float = 0.1):
 
     def gt(a: float, b: float) -> bool:
         return a > b and not math.isclose(a, b, rel_tol=margin, abs_tol=0.0)
@@ -175,18 +206,29 @@ if __name__ == '__main__':
     fig, ax = plt.subplots()
     df = get_prices_df()
     # avg_price(df)
-    # daily_prices_ratios()
+    daily_prices_ratios()
 
     # all_prices()
+    exit()
 
-    a: pd.DataFrame = get_prices_optimums(df, datetime(year=2021, month=9, day=1))
-    a['potential_profit'] = a.apply(
-        lambda row: prices_diff_profit_per_mwh(row['optimums'][4], row['optimums'][5], row['optimums'][6], row['optimums'][7], 0.85),
-        axis=1,
-    )
+    res = get_prices_optimums(df)
+    a = res[res['date'] < datetime(year=2020, month=1, day=1) - timedelta(days=30 * 6)]
+    print(a)
+    a = a.value_counts('cls')
+    print(a)
+    b = res[res['date'] > datetime(year=2020, month=1, day=1) - timedelta(days=30 * 6)]
+    b = b[b['date'] < datetime(year=2020, month=1, day=1)]
+    print(b)
+    b = b.value_counts('cls')
+    print(b)
+    # a: pd.DataFrame = get_prices_optimums(df, datetime(year=2021, month=9, day=1))
+    # a['potential_profit'] = a.apply(
+    #     lambda row: prices_diff_profit_per_mwh(row['optimums'][4], row['optimums'][5], row['optimums'][6], row['optimums'][7], 0.85),
+    #     axis=1,
+    # )
     # prices_optimums['cls'] = prices_optimums.apply(lambda row: row['optimums'][-1], axis=1)
     # prices_optimums['weekday'] = prices_optimums.apply(lambda row: row['date'].isoweekday(), axis=1)
-    a = a[a['date'] < datetime(year=2021, month=9, day=1)]
-    a = a[a['date'] >= datetime(year=2020, month=7, day=17)]
-    print(len(a))
-    print(np.cumsum(a['potential_profit']) * 0.9 * 0.864)
+    # a = a[a['date'] < datetime(year=2021, month=9, day=1)]
+    # a = a[a['date'] >= datetime(year=2020, month=7, day=17)]
+    # print(len(a))
+    # print(np.cumsum(a['potential_profit']) * 0.9 * 0.864)
